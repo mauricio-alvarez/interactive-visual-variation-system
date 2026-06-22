@@ -6,6 +6,6 @@ models/
 data/raw/
 outputs/sessions/
 tmp/
+logs/
 .pytest_cache/
 .mypy_cache/
-
