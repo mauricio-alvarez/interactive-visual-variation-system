@@ -8,77 +8,175 @@
   </head>
   <body>
     <main class="shell">
-      <section class="toolbar">
+      <header class="topbar">
         <div>
+          <p class="eyebrow">Local AI photo editor</p>
           <h1>{{ project_name }}</h1>
-          <p id="health">Checking GPU...</p>
         </div>
-        <form id="upload-form" class="upload-form">
-          <input id="image-input" name="image" type="file" accept="image/*" required />
-          <select id="mode-input" name="mode">
-            <option value="diffusion" selected>GPU studio</option>
-            <option value="demo">Fast demo</option>
-          </select>
-          <label class="toggle">
-            <input id="face-preserve-input" name="preserve_faces" type="checkbox" value="true" checked />
-            Face lock
-          </label>
-          <input id="seed-input" name="base_seed" type="number" value="4200" min="1" />
-          <button type="submit">Create studio set</button>
-        </form>
-      </section>
+        <div class="status-stack">
+          <span id="health" class="status-pill">Checking runtime</span>
+          <span id="workflow-state" class="status-pill muted">Ready</span>
+        </div>
+      </header>
 
-      <section class="workbench">
-        <aside class="input-panel">
-          <h2>Original</h2>
-          <img id="input-preview" src="/examples/session_001/input.png" alt="Input preview" />
+      <section class="studio-layout">
+        <aside class="control-panel" aria-label="Studio controls">
+          <form id="upload-form">
+            <label id="dropzone" class="dropzone" for="image-input">
+              <span class="dropzone-title">Upload portrait</span>
+              <span id="file-name" class="dropzone-note">JPG, PNG, or WebP</span>
+              <input id="image-input" name="image" type="file" accept="image/*" required />
+            </label>
+
+            <div class="field-group">
+              <span class="field-label">Generation mode</span>
+              <div class="segmented">
+                <label>
+                  <input type="radio" name="mode" value="demo" checked />
+                  <span>Preview</span>
+                </label>
+                <label>
+                  <input type="radio" name="mode" value="diffusion" />
+                  <span>GPU studio</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <label class="switch">
+                <input id="face-preserve-input" name="preserve_faces" type="checkbox" value="true" checked />
+                <span>Face lock</span>
+              </label>
+              <label class="seed-field">
+                <span>Seed</span>
+                <input id="seed-input" name="base_seed" type="number" value="4200" min="1" />
+              </label>
+            </div>
+
+            <button id="generate-button" class="primary-action" type="submit">Create studio set</button>
+          </form>
+
+          <div class="process-panel">
+            <h2>Workflow</h2>
+            <ol>
+              <li>Upload a portrait</li>
+              <li>Create five studio looks</li>
+              <li>Keep or pass each result</li>
+              <li>Save the selection notes</li>
+            </ol>
+          </div>
         </aside>
 
-        <section class="variation-panel">
-          <div class="panel-head">
-            <h2>Studio Looks</h2>
-            <button id="submit-decisions" type="button" disabled>Save selection</button>
-          </div>
-          <div id="variations" class="grid"></div>
-        </section>
-      </section>
+        <section class="workspace" aria-label="Portrait workspace">
+          <div class="preview-strip">
+            <div class="original-frame">
+              <div class="section-head">
+                <h2>Original</h2>
+                <span id="input-state">Sample loaded</span>
+              </div>
+              <img id="input-preview" src="/examples/session_001/input.png" alt="Input preview" />
+            </div>
 
-      <section class="summary-panel">
-        <h2>Studio Notes</h2>
-        <p id="summary">Create a studio set and select the strongest outputs.</p>
+            <div class="summary-panel">
+              <div class="section-head">
+                <h2>Studio Notes</h2>
+                <span id="decision-count">0 of 5 selected</span>
+              </div>
+              <p id="summary">Use Preview mode to test the interface without loading the model. Switch to GPU studio when you are ready to generate final portrait edits.</p>
+            </div>
+          </div>
+
+          <div class="section-head looks-head">
+            <h2>Studio Looks</h2>
+            <button id="submit-decisions" class="secondary-action" type="button" disabled>Save selection</button>
+          </div>
+          <div id="variations" class="looks-grid" aria-live="polite"></div>
+        </section>
       </section>
     </main>
 
     <script>
+      const imageInput = document.getElementById("image-input");
+      const fileName = document.getElementById("file-name");
+      const dropzone = document.getElementById("dropzone");
+      const generateButton = document.getElementById("generate-button");
+      const submitButton = document.getElementById("submit-decisions");
+      const summary = document.getElementById("summary");
+      const workflowState = document.getElementById("workflow-state");
+      const decisionCount = document.getElementById("decision-count");
+      const inputState = document.getElementById("input-state");
+
       let currentSession = "";
       let currentVariations = [];
 
+      const sampleVariations = [
+        { id: 1, label: "Natural lighting", image_url: "/examples/session_001/variation_1.png", seed: 4201, strength: 0.28, face_preservation: true, detected_faces: 1 },
+        { id: 2, label: "Cinematic tint", image_url: "/examples/session_001/variation_2.png", seed: 4202, strength: 0.32, face_preservation: true, detected_faces: 1 },
+        { id: 3, label: "Studio headshot", image_url: "/examples/session_001/variation_3.png", seed: 4203, strength: 0.3, face_preservation: true, detected_faces: 1 },
+        { id: 4, label: "Editorial polish", image_url: "/examples/session_001/variation_4.png", seed: 4204, strength: 0.34, face_preservation: true, detected_faces: 1 },
+        { id: 5, label: "Soft luxury retouch", image_url: "/examples/session_001/variation_5.png", seed: 4205, strength: 0.26, face_preservation: true, detected_faces: 1 },
+      ];
+
       async function loadHealth() {
-        const response = await fetch("/api/health");
-        const data = await response.json();
-        const gpu = data.cuda_available ? data.gpu_name : "CUDA not available";
-        document.getElementById("health").textContent = `${data.device} | ${gpu} | ${data.model_id}`;
+        try {
+          const response = await fetch("/api/health");
+          const data = await response.json();
+          const gpu = data.cuda_available ? data.gpu_name : "GPU unavailable";
+          document.getElementById("health").textContent = `${data.device} | ${gpu}`;
+        } catch {
+          document.getElementById("health").textContent = "Runtime unavailable";
+        }
       }
 
-      function renderVariations(variations) {
+      function updateUploadedPreview(file) {
+        if (!file) return;
+        fileName.textContent = file.name;
+        inputState.textContent = "Uploaded";
+        document.getElementById("input-preview").src = URL.createObjectURL(file);
+      }
+
+      imageInput.addEventListener("change", () => updateUploadedPreview(imageInput.files[0]));
+
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("is-dragging");
+      });
+
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("is-dragging"));
+
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("is-dragging");
+        if (event.dataTransfer.files.length) {
+          imageInput.files = event.dataTransfer.files;
+          updateUploadedPreview(event.dataTransfer.files[0]);
+        }
+      });
+
+      function renderVariations(variations, interactive = true) {
         const container = document.getElementById("variations");
         container.innerHTML = "";
         variations.forEach((item) => {
+          const faceText = item.face_preservation ? `Face lock: ${item.detected_faces ?? 0}` : "Face lock off";
           const card = document.createElement("article");
-          card.className = "card";
+          card.className = "look-card";
           card.innerHTML = `
-            <img src="${item.image_url}" alt="Variation ${item.id}" />
-            <div class="card-body">
-              <h3>${item.id}. ${item.label}</h3>
-              <p>seed ${item.seed} | strength ${item.strength} | faces ${item.detected_faces ?? 0}</p>
-              <div class="decision-row">
-                <label><input type="radio" name="decision-${item.id}" value="accepted" /> Keep</label>
-                <label><input type="radio" name="decision-${item.id}" value="rejected" /> Pass</label>
+            <img src="${item.image_url}" alt="${item.label}" />
+            <div class="look-body">
+              <div class="look-title">
+                <h3>${item.label}</h3>
+                <span>#${item.id}</span>
               </div>
-              <input class="reason" type="text" placeholder="Selection note" data-id="${item.id}" />
+              <p>${faceText} · strength ${item.strength} · seed ${item.seed}</p>
+              <div class="choice-row" role="radiogroup" aria-label="Decision for ${item.label}">
+                <label><input type="radio" name="decision-${item.id}" value="accepted" ${interactive ? "" : "disabled"} /> <span>Keep</span></label>
+                <label><input type="radio" name="decision-${item.id}" value="rejected" ${interactive ? "" : "disabled"} /> <span>Pass</span></label>
+              </div>
+              <input class="reason" type="text" placeholder="Selection note" data-id="${item.id}" ${interactive ? "" : "disabled"} />
             </div>`;
           container.appendChild(card);
         });
+        updateSelectionState();
       }
 
       function collectDecisions() {
@@ -93,54 +191,71 @@
         });
       }
 
+      function updateSelectionState() {
+        if (!currentVariations.length) {
+          decisionCount.textContent = "0 of 5 selected";
+          submitButton.disabled = true;
+          return;
+        }
+        const decisions = collectDecisions();
+        const selected = decisions.filter((item) => item.decision).length;
+        decisionCount.textContent = `${selected} of ${currentVariations.length} selected`;
+        submitButton.disabled = selected !== currentVariations.length || !currentSession;
+      }
+
+      document.getElementById("variations").addEventListener("change", updateSelectionState);
+
       document.getElementById("upload-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = new FormData(event.target);
         if (!document.getElementById("face-preserve-input").checked) {
           form.set("preserve_faces", "false");
         }
-        document.getElementById("summary").textContent = "Creating studio looks...";
-        document.getElementById("submit-decisions").disabled = true;
+
+        generateButton.disabled = true;
+        submitButton.disabled = true;
+        workflowState.textContent = "Processing";
+        summary.textContent = "Creating the studio set...";
 
         const response = await fetch("/api/generate", { method: "POST", body: form });
         const data = await response.json();
+        generateButton.disabled = false;
+
         if (!response.ok) {
-          document.getElementById("summary").textContent = data.detail || "Generation failed.";
+          workflowState.textContent = "Needs attention";
+          summary.textContent = data.detail || "Generation failed.";
           return;
         }
 
         currentSession = data.session_id;
         currentVariations = data.variations;
         document.getElementById("input-preview").src = data.input_image_url;
-        renderVariations(data.variations);
-        document.getElementById("summary").textContent = "Select keep or pass for all five looks.";
-        document.getElementById("submit-decisions").disabled = false;
+        inputState.textContent = "Session image";
+        renderVariations(data.variations, true);
+        workflowState.textContent = "Review";
+        summary.textContent = "Review all five looks and keep the results that feel production-ready.";
       });
 
-      document.getElementById("submit-decisions").addEventListener("click", async () => {
+      submitButton.addEventListener("click", async () => {
         const decisions = collectDecisions();
         if (decisions.some((item) => !item.decision)) {
-          document.getElementById("summary").textContent = "Every look needs a keep/pass decision.";
+          summary.textContent = "Every studio look needs a keep/pass decision.";
           return;
         }
 
+        workflowState.textContent = "Saving";
         const response = await fetch(`/api/sessions/${currentSession}/decisions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ decisions }),
         });
         const data = await response.json();
-        document.getElementById("summary").textContent = response.ok ? data.summary : data.detail;
+        workflowState.textContent = response.ok ? "Saved" : "Needs attention";
+        summary.textContent = response.ok ? data.summary : data.detail;
       });
 
       loadHealth();
-      renderVariations([
-        { id: 1, label: "Natural lighting", image_url: "/examples/session_001/variation_1.png", seed: 4201, strength: 0.28 },
-        { id: 2, label: "Cinematic tint", image_url: "/examples/session_001/variation_2.png", seed: 4202, strength: 0.32 },
-        { id: 3, label: "Studio headshot", image_url: "/examples/session_001/variation_3.png", seed: 4203, strength: 0.3 },
-        { id: 4, label: "Editorial polish", image_url: "/examples/session_001/variation_4.png", seed: 4204, strength: 0.34 },
-        { id: 5, label: "Soft luxury retouch", image_url: "/examples/session_001/variation_5.png", seed: 4205, strength: 0.26 },
-      ]);
+      renderVariations(sampleVariations, false);
     </script>
   </body>
 </html>

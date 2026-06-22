@@ -51,7 +51,19 @@ huggingface-cli login
 
 - `docs/architecture.md`
 - `docs/dataset_and_training.md`
+- `docs/deployment.md`
 - `docs/execution_plan.md`
 - `docs/evaluation.md`
 - `docs/ethics.md`
 - `docs/face_preservation.md`
+
+## Deployment
+
+The deployable preview container runs the UI and Preview mode without requiring model weights or the full diffusion stack:
+
+```powershell
+docker build -t ai-portrait-studio .
+docker run --rm -p 8000:8000 ai-portrait-studio
+```
+
+GPU studio deployment needs a CUDA host, the GPU PyTorch wheel, and local model weights. See `docs/deployment.md`.
