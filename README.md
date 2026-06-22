@@ -36,6 +36,8 @@ Open `http://127.0.0.1:8000`.
 
 Use `CUDA diffusion` for the real local GPU path. Use `Fast demo` only for UI testing and documentation screenshots.
 
+The local default disables the built-in Stable Diffusion safety checker because it can false-positive on the non-human classroom demo images. Re-enable it with `VISGEN_DISABLE_SAFETY_CHECKER=false` before accepting unknown, public, or human-subject uploads.
+
 ## Model weights
 
 The first CUDA generation downloads the model from Hugging Face unless it already exists in the local cache. If Hugging Face requires acceptance or authentication for the selected model, authenticate with:
@@ -51,4 +53,3 @@ huggingface-cli login
 - `docs/execution_plan.md`
 - `docs/evaluation.md`
 - `docs/ethics.md`
-

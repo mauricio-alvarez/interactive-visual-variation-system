@@ -16,6 +16,7 @@
 - Store user decisions transparently in JSON.
 - Make the explanation agent quote the decision record rather than invent rationale.
 - Document dataset source, license, and limitations.
+- Re-enable the model safety checker before accepting unknown public uploads or human-subject images.
 
 ## Report angle
 
@@ -26,4 +27,3 @@ The strongest ethical discussion is specific:
 - What the model fails to preserve.
 - What should not be inferred from the generated images.
 - How the UI keeps the human in control of final selection.
-

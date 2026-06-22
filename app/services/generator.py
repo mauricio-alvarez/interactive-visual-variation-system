@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-from app.core.settings import settings
+from app.core.settings import PROJECT_ROOT, settings
 
 
 @dataclass(frozen=True)
@@ -73,7 +73,9 @@ class ImageVariationGenerator:
             kwargs["safety_checker"] = None
             kwargs["requires_safety_checker"] = False
 
-        pipe = StableDiffusionImg2ImgPipeline.from_pretrained(settings.model_id, **kwargs)
+        local_model = PROJECT_ROOT / "models" / settings.model_id.replace("/", "__")
+        model_source = str(local_model) if local_model.exists() else settings.model_id
+        pipe = StableDiffusionImg2ImgPipeline.from_pretrained(model_source, **kwargs)
         pipe = pipe.to(settings.device)
         pipe.enable_attention_slicing()
         pipe.enable_vae_slicing()
@@ -163,4 +165,3 @@ class ImageVariationGenerator:
             "strength": style.strength,
             "guidance_scale": style.guidance_scale,
         }
-

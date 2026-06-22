@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     output_dir: Path = PROJECT_ROOT / "outputs" / "sessions"
     examples_dir: Path = PROJECT_ROOT / "examples"
     config_path: Path = PROJECT_ROOT / "config" / "generation.yaml"
-    disable_safety_checker: bool = False
+    disable_safety_checker: bool = True
     explainer_provider: str = "rule"
     local_llm_model_id: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
@@ -30,4 +30,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
