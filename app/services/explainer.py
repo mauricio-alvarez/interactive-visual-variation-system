@@ -22,10 +22,10 @@ class DecisionExplanationAgent:
         reason_text = " User notes: " + " | ".join(reasons) if reasons else ""
 
         return (
-            f"The user accepted variation(s): {accepted_ids}. "
-            f"The user rejected variation(s): {rejected_ids}. "
-            "The final selection reflects the recorded accept/reject feedback and should be "
-            "used as the decision trace for this session."
+            f"The user kept studio look(s): {accepted_ids}. "
+            f"The user passed on studio look(s): {rejected_ids}. "
+            "The final selection reflects the recorded feedback and should be used as the "
+            "decision trace for this editing session."
             f"{reason_text}"
         )
 
@@ -34,4 +34,3 @@ def accepted_rejected_ids(decisions: list[dict[str, Any]]) -> tuple[list[int], l
     accepted = [item["variation_id"] for item in decisions if item["decision"] == "accepted"]
     rejected = [item["variation_id"] for item in decisions if item["decision"] == "rejected"]
     return accepted, rejected
-

@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     """Runtime settings loaded from environment variables or .env."""
 
-    project_name: str = "Interactive Visual Variation System"
+    project_name: str = "AI Portrait Studio"
     model_id: str = "runwayml/stable-diffusion-v1-5"
     lora_path: str = ""
     device: str = "cuda"

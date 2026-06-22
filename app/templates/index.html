@@ -16,32 +16,36 @@
         <form id="upload-form" class="upload-form">
           <input id="image-input" name="image" type="file" accept="image/*" required />
           <select id="mode-input" name="mode">
-            <option value="diffusion" selected>CUDA diffusion</option>
+            <option value="diffusion" selected>GPU studio</option>
             <option value="demo">Fast demo</option>
           </select>
+          <label class="toggle">
+            <input id="face-preserve-input" name="preserve_faces" type="checkbox" value="true" checked />
+            Face lock
+          </label>
           <input id="seed-input" name="base_seed" type="number" value="4200" min="1" />
-          <button type="submit">Generate 5 variations</button>
+          <button type="submit">Create studio set</button>
         </form>
       </section>
 
       <section class="workbench">
         <aside class="input-panel">
-          <h2>Input</h2>
+          <h2>Original</h2>
           <img id="input-preview" src="/examples/session_001/input.png" alt="Input preview" />
         </aside>
 
         <section class="variation-panel">
           <div class="panel-head">
-            <h2>Variations</h2>
-            <button id="submit-decisions" type="button" disabled>Submit decisions</button>
+            <h2>Studio Looks</h2>
+            <button id="submit-decisions" type="button" disabled>Save selection</button>
           </div>
           <div id="variations" class="grid"></div>
         </section>
       </section>
 
       <section class="summary-panel">
-        <h2>Agent summary</h2>
-        <p id="summary">Generate variations and mark each one accepted or rejected.</p>
+        <h2>Studio Notes</h2>
+        <p id="summary">Create a studio set and select the strongest outputs.</p>
       </section>
     </main>
 
@@ -66,12 +70,12 @@
             <img src="${item.image_url}" alt="Variation ${item.id}" />
             <div class="card-body">
               <h3>${item.id}. ${item.label}</h3>
-              <p>seed ${item.seed} | strength ${item.strength}</p>
+              <p>seed ${item.seed} | strength ${item.strength} | faces ${item.detected_faces ?? 0}</p>
               <div class="decision-row">
-                <label><input type="radio" name="decision-${item.id}" value="accepted" /> Accept</label>
-                <label><input type="radio" name="decision-${item.id}" value="rejected" /> Reject</label>
+                <label><input type="radio" name="decision-${item.id}" value="accepted" /> Keep</label>
+                <label><input type="radio" name="decision-${item.id}" value="rejected" /> Pass</label>
               </div>
-              <input class="reason" type="text" placeholder="Optional reason" data-id="${item.id}" />
+              <input class="reason" type="text" placeholder="Selection note" data-id="${item.id}" />
             </div>`;
           container.appendChild(card);
         });
@@ -92,7 +96,10 @@
       document.getElementById("upload-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = new FormData(event.target);
-        document.getElementById("summary").textContent = "Generating variations...";
+        if (!document.getElementById("face-preserve-input").checked) {
+          form.set("preserve_faces", "false");
+        }
+        document.getElementById("summary").textContent = "Creating studio looks...";
         document.getElementById("submit-decisions").disabled = true;
 
         const response = await fetch("/api/generate", { method: "POST", body: form });
@@ -106,14 +113,14 @@
         currentVariations = data.variations;
         document.getElementById("input-preview").src = data.input_image_url;
         renderVariations(data.variations);
-        document.getElementById("summary").textContent = "Mark all five variations.";
+        document.getElementById("summary").textContent = "Select keep or pass for all five looks.";
         document.getElementById("submit-decisions").disabled = false;
       });
 
       document.getElementById("submit-decisions").addEventListener("click", async () => {
         const decisions = collectDecisions();
         if (decisions.some((item) => !item.decision)) {
-          document.getElementById("summary").textContent = "Every variation needs an accept/reject decision.";
+          document.getElementById("summary").textContent = "Every look needs a keep/pass decision.";
           return;
         }
 
@@ -128,13 +135,12 @@
 
       loadHealth();
       renderVariations([
-        { id: 1, label: "Natural lighting", image_url: "/examples/session_001/variation_1.png", seed: 4201, strength: 0.42 },
-        { id: 2, label: "Editorial color", image_url: "/examples/session_001/variation_2.png", seed: 4202, strength: 0.48 },
-        { id: 3, label: "Clean contrast", image_url: "/examples/session_001/variation_3.png", seed: 4203, strength: 0.5 },
-        { id: 4, label: "Sharpened detail", image_url: "/examples/session_001/variation_4.png", seed: 4204, strength: 0.54 },
-        { id: 5, label: "Cinematic tint", image_url: "/examples/session_001/variation_5.png", seed: 4205, strength: 0.58 },
+        { id: 1, label: "Natural lighting", image_url: "/examples/session_001/variation_1.png", seed: 4201, strength: 0.28 },
+        { id: 2, label: "Cinematic tint", image_url: "/examples/session_001/variation_2.png", seed: 4202, strength: 0.32 },
+        { id: 3, label: "Studio headshot", image_url: "/examples/session_001/variation_3.png", seed: 4203, strength: 0.3 },
+        { id: 4, label: "Editorial polish", image_url: "/examples/session_001/variation_4.png", seed: 4204, strength: 0.34 },
+        { id: 5, label: "Soft luxury retouch", image_url: "/examples/session_001/variation_5.png", seed: 4205, strength: 0.26 },
       ]);
     </script>
   </body>
 </html>
-

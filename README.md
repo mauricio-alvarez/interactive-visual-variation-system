@@ -1,12 +1,13 @@
-# Interactive Visual Variation System
+# AI Portrait Studio
 
-FastAPI project for the advanced version of UTEC Project 2: generate exactly five visual variations from a user image, collect human accept/reject feedback, and produce a faithful decision summary.
+FastAPI project for the advanced version of UTEC Project 2. The app works as a local AI portrait studio: it takes a user image, creates exactly five professional photographer-style looks, collects keep/pass feedback, and produces a faithful decision summary.
 
 ## Current design
 
 - Local GPU-first generation with Stable Diffusion img2img through `diffusers`.
 - RTX 3060 Ti friendly defaults: 512x512, fp16, 28 steps, attention slicing.
-- Five fixed variation styles from `config/generation.yaml`.
+- Five studio presets from `config/generation.yaml`: natural lighting, cinematic tint, studio headshot, editorial polish, and soft luxury retouch.
+- Face lock: optional OpenCV face detection plus soft facial-region blending to reduce identity drift and malformed faces.
 - Browser UI for upload, generation, feedback, and summary.
 - JSON session records under `outputs/sessions`.
 - Tracked visual example under `examples/session_001`.
@@ -32,9 +33,9 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000`.
+Open `http://127.0.0.1:8001`.
 
-Use `CUDA diffusion` for the real local GPU path. Use `Fast demo` only for UI testing and documentation screenshots.
+Use `GPU studio` for the real local GPU path. Use `Fast demo` only for UI testing and documentation screenshots.
 
 The local default disables the built-in Stable Diffusion safety checker because it can false-positive on the non-human classroom demo images. Re-enable it with `VISGEN_DISABLE_SAFETY_CHECKER=false` before accepting unknown, public, or human-subject uploads.
 
@@ -53,3 +54,4 @@ huggingface-cli login
 - `docs/execution_plan.md`
 - `docs/evaluation.md`
 - `docs/ethics.md`
+- `docs/face_preservation.md`

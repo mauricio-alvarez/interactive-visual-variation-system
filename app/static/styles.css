@@ -1,8 +1,8 @@
 :root {
   color-scheme: light;
   font-family: Inter, Segoe UI, Arial, sans-serif;
-  background: #f4f6f8;
-  color: #17202a;
+  background: #eef1f3;
+  color: #15191d;
 }
 
 * {
@@ -23,7 +23,7 @@ body {
 .workbench,
 .summary-panel {
   background: #ffffff;
-  border: 1px solid #d9e0e7;
+  border: 1px solid #d7dde2;
   border-radius: 8px;
   margin-bottom: 18px;
   padding: 18px;
@@ -59,7 +59,7 @@ h3 {
 }
 
 #health {
-  color: #586575;
+  color: #5d6872;
   margin-top: 6px;
 }
 
@@ -74,16 +74,16 @@ input,
 select,
 button {
   min-height: 38px;
-  border: 1px solid #bcc8d4;
+  border: 1px solid #b8c3cc;
   border-radius: 6px;
   padding: 8px 10px;
   font: inherit;
 }
 
 button {
-  background: #0f6b5f;
+  background: #11675e;
   color: #ffffff;
-  border-color: #0f6b5f;
+  border-color: #11675e;
   cursor: pointer;
 }
 
@@ -91,6 +91,22 @@ button:disabled {
   background: #8c9aa7;
   border-color: #8c9aa7;
   cursor: not-allowed;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid #b8c3cc;
+  border-radius: 6px;
+  background: #f8fafb;
+  white-space: nowrap;
+}
+
+.toggle input {
+  min-height: auto;
 }
 
 .workbench {
@@ -123,7 +139,7 @@ button:disabled {
 }
 
 .card {
-  border: 1px solid #d9e0e7;
+  border: 1px solid #d7dde2;
   border-radius: 8px;
   overflow: hidden;
   background: #fbfcfd;
@@ -174,4 +190,3 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
-

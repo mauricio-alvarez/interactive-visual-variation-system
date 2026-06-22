@@ -61,6 +61,7 @@ async def generate(
     image: UploadFile = File(...),
     mode: str = Form("diffusion"),
     base_seed: int = Form(4200),
+    preserve_faces: bool = Form(True),
 ):
     if mode not in {"diffusion", "demo"}:
         raise HTTPException(status_code=400, detail="mode must be diffusion or demo")
@@ -70,7 +71,13 @@ async def generate(
     variations_dir = session_dir / "variations"
 
     try:
-        variations = generator.generate(input_path, variations_dir, base_seed=base_seed, mode=mode)
+        variations = generator.generate(
+            input_path,
+            variations_dir,
+            base_seed=base_seed,
+            mode=mode,
+            preserve_faces=preserve_faces,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -83,6 +90,7 @@ async def generate(
         "session_id": session_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
+        "preserve_faces": preserve_faces,
         "input_image": str(input_path),
         "input_image_url": public_output_url(input_path),
         "variations": response_variations,
@@ -94,6 +102,7 @@ async def generate(
     return {
         "session_id": session_id,
         "mode": mode,
+        "preserve_faces": preserve_faces,
         "input_image_url": record["input_image_url"],
         "variations": response_variations,
     }

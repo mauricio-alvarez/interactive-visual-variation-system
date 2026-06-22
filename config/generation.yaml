@@ -1,7 +1,7 @@
 dataset:
-  recommended: "AFHQ v2 subset"
-  reason: "Animal faces avoid identity-manipulation risk while still supporting pose, lighting, texture, and style variation analysis."
-  fallback: "A small self-collected object or product image set with clear consent and license notes."
+  recommended: "Consented personal portraits or a licensed portrait subset"
+  reason: "The product direction is a professional AI photo studio, so evaluation should focus on identity preservation, skin realism, lighting, and portrait quality."
+  fallback: "AFHQ v2 or consented product images when avoiding human-subject data."
 
 generation:
   model_id: "runwayml/stable-diffusion-v1-5"
@@ -9,32 +9,31 @@ generation:
   num_inference_steps: 28
   device: "cuda"
   precision: "float16"
-  notes: "Designed for an RTX 3060 Ti 8GB using attention slicing and VAE slicing."
+  notes: "Designed for an RTX 3060 Ti 8GB. Portrait presets use conservative img2img strengths to preserve facial geometry."
 
 variations:
   - label: "Natural lighting"
-    prompt: "high quality image, natural lighting, realistic texture, faithful structure, clean background"
-    strength: 0.42
-    guidance_scale: 7.0
+    prompt: "professional portrait photo, natural window lighting, realistic skin texture, same face, same identity, sharp eyes, clean background, 85mm lens, subtle retouching"
+    strength: 0.28
+    guidance_scale: 6.7
     seed_offset: 1
-  - label: "Editorial color"
-    prompt: "high quality editorial color grading, polished lighting, faithful structure, detailed subject"
-    strength: 0.48
-    guidance_scale: 7.3
-    seed_offset: 2
-  - label: "Clean contrast"
-    prompt: "high quality image with balanced contrast, clear subject separation, faithful structure"
-    strength: 0.50
-    guidance_scale: 7.5
-    seed_offset: 3
-  - label: "Sharpened detail"
-    prompt: "high quality detailed rendering, refined edges, realistic texture, faithful subject identity"
-    strength: 0.54
-    guidance_scale: 7.7
-    seed_offset: 4
   - label: "Cinematic tint"
-    prompt: "high quality cinematic lighting, subtle color tint, realistic image, faithful composition"
-    strength: 0.58
-    guidance_scale: 8.0
+    prompt: "professional portrait photo, cinematic color tint, soft rim light, same face, same identity, realistic skin texture, sharp eyes, elegant studio mood"
+    strength: 0.32
+    guidance_scale: 7.0
+    seed_offset: 2
+  - label: "Studio headshot"
+    prompt: "professional studio headshot, softbox lighting, clean neutral background, same face, same identity, natural expression, sharp eyes, realistic skin, premium LinkedIn photo"
+    strength: 0.30
+    guidance_scale: 7.1
+    seed_offset: 3
+  - label: "Editorial polish"
+    prompt: "professional editorial portrait, refined color grading, balanced contrast, same face, same identity, realistic skin pores, sharp eyes, magazine-quality lighting"
+    strength: 0.34
+    guidance_scale: 7.2
+    seed_offset: 4
+  - label: "Soft luxury retouch"
+    prompt: "professional luxury portrait retouch, soft flattering light, same face, same identity, natural skin texture, no plastic skin, elegant background, premium photographer style"
+    strength: 0.26
+    guidance_scale: 6.8
     seed_offset: 5
-

@@ -10,11 +10,14 @@ class VariationInfo(BaseModel):
     prompt: str
     strength: float
     guidance_scale: float
+    face_preservation: bool = True
+    detected_faces: int = 0
 
 
 class GenerationResponse(BaseModel):
     session_id: str
     mode: str
+    preserve_faces: bool
     input_image_url: str
     variations: list[VariationInfo]
 
@@ -35,4 +38,3 @@ class DecisionResponse(BaseModel):
     accepted_ids: list[int]
     rejected_ids: list[int]
     record_path: str
-

@@ -2,18 +2,18 @@
 
 ## Dataset choice
 
-Recommended dataset: AFHQ v2 subset.
+Recommended dataset: consented personal portraits or a licensed portrait subset.
 
 Reason:
 
-- It supports face-like image variation analysis without manipulating real human identity.
-- It has clear visual attributes: pose, texture, lighting, background, and color.
-- It reduces privacy and consent risk compared with human face datasets.
-- It is feasible for small LoRA experiments.
+- It matches the professional studio goal.
+- It supports direct evaluation of identity preservation, eyes, skin texture, lighting, and retouching.
+- It can be ethically valid if the team uses consented images or a dataset with compatible license terms.
+- It is feasible for small LoRA experiments when the subset is controlled.
 
 Fallback dataset:
 
-- A small product/object dataset collected by the team.
+- AFHQ v2 or a small product/object dataset if the team decides to avoid human-subject images.
 - Use only images with explicit permission or compatible public licenses.
 
 ## Preparation
@@ -38,15 +38,14 @@ Recommended generation defaults:
 - Resolution: 512x512.
 - Precision: fp16.
 - Steps: 28.
-- Guidance scale: 7.0 to 8.0.
-- Strength: 0.42 to 0.58.
-- Exactly five variations with fixed seed offsets.
+- Guidance scale: 6.7 to 7.2.
+- Strength: 0.26 to 0.34 for portraits.
+- Exactly five studio looks with fixed seed offsets.
 
 ## What to report
 
 - Why the dataset fits the use case.
 - What attributes are intended to vary.
-- What attributes should be preserved.
+- What attributes should be preserved, especially facial identity and eye/mouth geometry.
 - Training or adaptation settings.
 - Failure cases: over-editing, low diversity, artifacts, identity drift, or prompt mismatch.
-

@@ -10,7 +10,7 @@
 
 ## Mitigations
 
-- Prefer AFHQ or consented object/product images for the main demo.
+- Prefer consented portraits, licensed portrait datasets, AFHQ, or consented object/product images for the main demo.
 - Avoid private or sensitive images.
 - Keep generated images clearly labeled as AI-generated variations.
 - Store user decisions transparently in JSON.

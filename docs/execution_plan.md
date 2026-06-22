@@ -2,8 +2,8 @@
 
 ## Phase 1 - Scope
 
-- Domain: AFHQ-style animal faces or consented object/product images.
-- Goal: generate five controlled visual alternatives and support human selection.
+- Domain: consented personal portraits or licensed portrait examples.
+- Goal: generate five professional photographer-style edits and support human selection.
 - Output: architecture diagram, constraints, and success criteria.
 
 ## Phase 2 - Data
@@ -19,14 +19,15 @@
 - Run the FastAPI app.
 - Test `Fast demo` mode for UI.
 - Download model weights or let first generation download them.
-- Test `CUDA diffusion` mode.
+- Test `GPU studio` mode.
 - Optionally fine-tune LoRA and set `VISGEN_LORA_PATH`.
 
 ## Phase 4 - Human Feedback
 
 - Upload an input image.
-- Generate exactly five variations.
-- Accept or reject every variation.
+- Generate exactly five studio looks.
+- Keep face lock enabled for portraits.
+- Keep or pass every look.
 - Store decisions in `outputs/sessions/<session_id>/record.json`.
 
 ## Phase 5 - Explanation
@@ -38,6 +39,7 @@
 ## Phase 6 - Evaluation
 
 - Measure visual diversity with inverse SSIM.
+- Evaluate face correctness: identity, eyes, mouth, skin texture, and artifacts.
 - Add human ratings for quality, usefulness, and fidelity.
 - Check explanation consistency.
 - Discuss limitations and ethical risks.
@@ -49,4 +51,3 @@
 - Architecture diagram.
 - Example input and five outputs.
 - Demo video or live demo.
-

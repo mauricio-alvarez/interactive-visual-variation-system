@@ -7,73 +7,83 @@
       "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_1.png",
       "seed": 4201,
       "label": "Natural lighting",
-      "prompt": "high quality image, natural lighting, realistic texture, faithful structure, clean background",
-      "strength": 0.42,
-      "guidance_scale": 7.0
+      "prompt": "professional portrait photo, natural window lighting, realistic skin texture, same face, same identity, sharp eyes, clean background, 85mm lens, subtle retouching",
+      "strength": 0.28,
+      "guidance_scale": 6.7,
+      "face_preservation": true,
+      "detected_faces": 0
     },
     {
       "id": 2,
       "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_2.png",
       "seed": 4202,
-      "label": "Editorial color",
-      "prompt": "high quality editorial color grading, polished lighting, faithful structure, detailed subject",
-      "strength": 0.48,
-      "guidance_scale": 7.3
+      "label": "Cinematic tint",
+      "prompt": "professional portrait photo, cinematic color tint, soft rim light, same face, same identity, realistic skin texture, sharp eyes, elegant studio mood",
+      "strength": 0.32,
+      "guidance_scale": 7.0,
+      "face_preservation": true,
+      "detected_faces": 0
     },
     {
       "id": 3,
       "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_3.png",
       "seed": 4203,
-      "label": "Clean contrast",
-      "prompt": "high quality image with balanced contrast, clear subject separation, faithful structure",
-      "strength": 0.5,
-      "guidance_scale": 7.5
+      "label": "Studio headshot",
+      "prompt": "professional studio headshot, softbox lighting, clean neutral background, same face, same identity, natural expression, sharp eyes, realistic skin, premium LinkedIn photo",
+      "strength": 0.3,
+      "guidance_scale": 7.1,
+      "face_preservation": true,
+      "detected_faces": 0
     },
     {
       "id": 4,
       "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_4.png",
       "seed": 4204,
-      "label": "Sharpened detail",
-      "prompt": "high quality detailed rendering, refined edges, realistic texture, faithful subject identity",
-      "strength": 0.54,
-      "guidance_scale": 7.7
+      "label": "Editorial polish",
+      "prompt": "professional editorial portrait, refined color grading, balanced contrast, same face, same identity, realistic skin pores, sharp eyes, magazine-quality lighting",
+      "strength": 0.34,
+      "guidance_scale": 7.2,
+      "face_preservation": true,
+      "detected_faces": 0
     },
     {
       "id": 5,
       "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_5.png",
       "seed": 4205,
-      "label": "Cinematic tint",
-      "prompt": "high quality cinematic lighting, subtle color tint, realistic image, faithful composition",
-      "strength": 0.58,
-      "guidance_scale": 8.0
+      "label": "Soft luxury retouch",
+      "prompt": "professional luxury portrait retouch, soft flattering light, same face, same identity, natural skin texture, no plastic skin, elegant background, premium photographer style",
+      "strength": 0.26,
+      "guidance_scale": 6.8,
+      "face_preservation": true,
+      "detected_faces": 0
     }
   ],
   "decisions": [
     {
       "variation_id": 1,
       "decision": "accepted",
-      "reason": "Best balance between realism and fidelity."
+      "reason": "Most natural portrait lighting."
     },
     {
       "variation_id": 2,
       "decision": "accepted",
-      "reason": "Useful color style for presentation."
+      "reason": "Cinematic mood works for a profile image."
     },
     {
       "variation_id": 3,
-      "decision": "rejected",
-      "reason": "Too flat compared with the original."
+      "decision": "accepted",
+      "reason": "Cleanest studio headshot look."
     },
     {
       "variation_id": 4,
-      "decision": "accepted",
-      "reason": "Sharper details improve visual quality."
+      "decision": "rejected",
+      "reason": "Too much contrast for this face."
     },
     {
       "variation_id": 5,
-      "decision": "rejected",
-      "reason": "Tint changes the intended mood too much."
+      "decision": "accepted",
+      "reason": "Soft retouch keeps the face approachable."
     }
   ],
-  "summary": "The user accepted variation(s): 1, 2, 4. The user rejected variation(s): 3, 5. The final selection reflects the recorded accept/reject feedback and should be used as the decision trace for this session. User notes: Variation 1: Best balance between realism and fidelity. | Variation 2: Useful color style for presentation. | Variation 3: Too flat compared with the original. | Variation 4: Sharper details improve visual quality. | Variation 5: Tint changes the intended mood too much."
+  "summary": "The user kept studio look(s): 1, 2, 3, 5. The user passed on studio look(s): 4. The final selection reflects the recorded feedback and should be used as the decision trace for this editing session. User notes: Variation 1: Most natural portrait lighting. | Variation 2: Cinematic mood works for a profile image. | Variation 3: Cleanest studio headshot look. | Variation 4: Too much contrast for this face. | Variation 5: Soft retouch keeps the face approachable."
 }

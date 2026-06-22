@@ -14,13 +14,18 @@ SESSION = ROOT / "examples" / "session_001"
 
 
 def create_input(path: Path) -> None:
-    image = Image.new("RGB", (512, 512), (236, 240, 243))
+    image = Image.new("RGB", (512, 512), (226, 232, 236))
     draw = ImageDraw.Draw(image)
-    draw.rectangle((76, 92, 436, 420), fill=(218, 226, 232), outline=(88, 101, 112), width=4)
-    draw.ellipse((156, 132, 356, 332), fill=(176, 194, 207), outline=(63, 87, 107), width=5)
-    draw.polygon([(256, 94), (306, 182), (206, 182)], fill=(18, 107, 95))
-    draw.rectangle((188, 342, 324, 386), fill=(42, 52, 62))
-    draw.text((128, 444), "Input image", fill=(32, 42, 52), font=ImageFont.load_default())
+    draw.rectangle((0, 0, 512, 512), fill=(224, 231, 235))
+    draw.ellipse((58, 44, 454, 438), fill=(210, 220, 226))
+    draw.rectangle((154, 346, 358, 512), fill=(45, 57, 68))
+    draw.ellipse((142, 86, 370, 338), fill=(207, 174, 145), outline=(103, 82, 69), width=4)
+    draw.pieslice((128, 56, 384, 266), 180, 360, fill=(42, 34, 32))
+    draw.ellipse((190, 180, 220, 210), fill=(34, 42, 49))
+    draw.ellipse((292, 180, 322, 210), fill=(34, 42, 49))
+    draw.line((256, 202, 244, 258, 265, 258), fill=(121, 85, 70), width=4)
+    draw.arc((218, 260, 294, 310), 8, 172, fill=(126, 56, 62), width=5)
+    draw.text((154, 454), "Synthetic portrait input", fill=(32, 42, 52), font=ImageFont.load_default())
     image.save(path)
 
 
@@ -33,11 +38,11 @@ def main() -> None:
     variations = generator.generate(input_path, SESSION, base_seed=4200, mode="demo")
 
     decisions = [
-        {"variation_id": 1, "decision": "accepted", "reason": "Best balance between realism and fidelity."},
-        {"variation_id": 2, "decision": "accepted", "reason": "Useful color style for presentation."},
-        {"variation_id": 3, "decision": "rejected", "reason": "Too flat compared with the original."},
-        {"variation_id": 4, "decision": "accepted", "reason": "Sharper details improve visual quality."},
-        {"variation_id": 5, "decision": "rejected", "reason": "Tint changes the intended mood too much."},
+        {"variation_id": 1, "decision": "accepted", "reason": "Most natural portrait lighting."},
+        {"variation_id": 2, "decision": "accepted", "reason": "Cinematic mood works for a profile image."},
+        {"variation_id": 3, "decision": "accepted", "reason": "Cleanest studio headshot look."},
+        {"variation_id": 4, "decision": "rejected", "reason": "Too much contrast for this face."},
+        {"variation_id": 5, "decision": "accepted", "reason": "Soft retouch keeps the face approachable."},
     ]
     record = {
         "session_id": "session_001",
