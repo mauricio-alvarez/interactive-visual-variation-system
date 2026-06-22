@@ -28,9 +28,9 @@ app.mount("/examples", StaticFiles(directory=PROJECT_ROOT / "examples"), name="e
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
-            "request": request,
             "project_name": settings.project_name,
             "default_mode": "diffusion",
         },
@@ -121,4 +121,3 @@ def save_decisions(session_id: str, request: DecisionRequest):
         "rejected_ids": rejected_ids,
         "record_path": str(record_path),
     }
-
