@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+models/
+data/raw/
+outputs/sessions/
+tmp/
+.pytest_cache/
+.mypy_cache/
+

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ project_name }}</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="toolbar">
+        <div>
+          <h1>{{ project_name }}</h1>
+          <p id="health">Checking GPU...</p>
+        </div>
+        <form id="upload-form" class="upload-form">
+          <input id="image-input" name="image" type="file" accept="image/*" required />
+          <select id="mode-input" name="mode">
+            <option value="diffusion" selected>CUDA diffusion</option>
+            <option value="demo">Fast demo</option>
+          </select>
+          <input id="seed-input" name="base_seed" type="number" value="4200" min="1" />
+          <button type="submit">Generate 5 variations</button>
+        </form>
+      </section>
+
+      <section class="workbench">
+        <aside class="input-panel">
+          <h2>Input</h2>
+          <img id="input-preview" src="/examples/session_001/input.png" alt="Input preview" />
+        </aside>
+
+        <section class="variation-panel">
+          <div class="panel-head">
+            <h2>Variations</h2>
+            <button id="submit-decisions" type="button" disabled>Submit decisions</button>
+          </div>
+          <div id="variations" class="grid"></div>
+        </section>
+      </section>
+
+      <section class="summary-panel">
+        <h2>Agent summary</h2>
+        <p id="summary">Generate variations and mark each one accepted or rejected.</p>
+      </section>
+    </main>
+
+    <script>
+      let currentSession = "";
+      let currentVariations = [];
+
+      async function loadHealth() {
+        const response = await fetch("/api/health");
+        const data = await response.json();
+        const gpu = data.cuda_available ? data.gpu_name : "CUDA not available";
+        document.getElementById("health").textContent = `${data.device} | ${gpu} | ${data.model_id}`;
+      }
+
+      function renderVariations(variations) {
+        const container = document.getElementById("variations");
+        container.innerHTML = "";
+        variations.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "card";
+          card.innerHTML = `
+            <img src="${item.image_url}" alt="Variation ${item.id}" />
+            <div class="card-body">
+              <h3>${item.id}. ${item.label}</h3>
+              <p>seed ${item.seed} | strength ${item.strength}</p>
+              <div class="decision-row">
+                <label><input type="radio" name="decision-${item.id}" value="accepted" /> Accept</label>
+                <label><input type="radio" name="decision-${item.id}" value="rejected" /> Reject</label>
+              </div>
+              <input class="reason" type="text" placeholder="Optional reason" data-id="${item.id}" />
+            </div>`;
+          container.appendChild(card);
+        });
+      }
+
+      function collectDecisions() {
+        return currentVariations.map((item) => {
+          const selected = document.querySelector(`input[name="decision-${item.id}"]:checked`);
+          const reason = document.querySelector(`input.reason[data-id="${item.id}"]`).value;
+          return {
+            variation_id: item.id,
+            decision: selected ? selected.value : "",
+            reason,
+          };
+        });
+      }
+
+      document.getElementById("upload-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.target);
+        document.getElementById("summary").textContent = "Generating variations...";
+        document.getElementById("submit-decisions").disabled = true;
+
+        const response = await fetch("/api/generate", { method: "POST", body: form });
+        const data = await response.json();
+        if (!response.ok) {
+          document.getElementById("summary").textContent = data.detail || "Generation failed.";
+          return;
+        }
+
+        currentSession = data.session_id;
+        currentVariations = data.variations;
+        document.getElementById("input-preview").src = data.input_image_url;
+        renderVariations(data.variations);
+        document.getElementById("summary").textContent = "Mark all five variations.";
+        document.getElementById("submit-decisions").disabled = false;
+      });
+
+      document.getElementById("submit-decisions").addEventListener("click", async () => {
+        const decisions = collectDecisions();
+        if (decisions.some((item) => !item.decision)) {
+          document.getElementById("summary").textContent = "Every variation needs an accept/reject decision.";
+          return;
+        }
+
+        const response = await fetch(`/api/sessions/${currentSession}/decisions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ decisions }),
+        });
+        const data = await response.json();
+        document.getElementById("summary").textContent = response.ok ? data.summary : data.detail;
+      });
+
+      loadHealth();
+      renderVariations([
+        { id: 1, label: "Natural lighting", image_url: "/examples/session_001/variation_1.png", seed: 4201, strength: 0.42 },
+        { id: 2, label: "Editorial color", image_url: "/examples/session_001/variation_2.png", seed: 4202, strength: 0.48 },
+        { id: 3, label: "Clean contrast", image_url: "/examples/session_001/variation_3.png", seed: 4203, strength: 0.5 },
+        { id: 4, label: "Sharpened detail", image_url: "/examples/session_001/variation_4.png", seed: 4204, strength: 0.54 },
+        { id: 5, label: "Cinematic tint", image_url: "/examples/session_001/variation_5.png", seed: 4205, strength: 0.58 },
+      ]);
+    </script>
+  </body>
+</html>
+

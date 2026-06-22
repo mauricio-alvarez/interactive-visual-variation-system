@@ -1,0 +1,79 @@
+{
+  "session_id": "session_001",
+  "input_image": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\input.png",
+  "variations": [
+    {
+      "id": 1,
+      "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_1.png",
+      "seed": 4201,
+      "label": "Natural lighting",
+      "prompt": "high quality image, natural lighting, realistic texture, faithful structure, clean background",
+      "strength": 0.42,
+      "guidance_scale": 7.0
+    },
+    {
+      "id": 2,
+      "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_2.png",
+      "seed": 4202,
+      "label": "Editorial color",
+      "prompt": "high quality editorial color grading, polished lighting, faithful structure, detailed subject",
+      "strength": 0.48,
+      "guidance_scale": 7.3
+    },
+    {
+      "id": 3,
+      "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_3.png",
+      "seed": 4203,
+      "label": "Clean contrast",
+      "prompt": "high quality image with balanced contrast, clear subject separation, faithful structure",
+      "strength": 0.5,
+      "guidance_scale": 7.5
+    },
+    {
+      "id": 4,
+      "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_4.png",
+      "seed": 4204,
+      "label": "Sharpened detail",
+      "prompt": "high quality detailed rendering, refined edges, realistic texture, faithful subject identity",
+      "strength": 0.54,
+      "guidance_scale": 7.7
+    },
+    {
+      "id": 5,
+      "image_path": "C:\\Users\\asus\\Desktop\\first_project\\examples\\session_001\\variation_5.png",
+      "seed": 4205,
+      "label": "Cinematic tint",
+      "prompt": "high quality cinematic lighting, subtle color tint, realistic image, faithful composition",
+      "strength": 0.58,
+      "guidance_scale": 8.0
+    }
+  ],
+  "decisions": [
+    {
+      "variation_id": 1,
+      "decision": "accepted",
+      "reason": "Best balance between realism and fidelity."
+    },
+    {
+      "variation_id": 2,
+      "decision": "accepted",
+      "reason": "Useful color style for presentation."
+    },
+    {
+      "variation_id": 3,
+      "decision": "rejected",
+      "reason": "Too flat compared with the original."
+    },
+    {
+      "variation_id": 4,
+      "decision": "accepted",
+      "reason": "Sharper details improve visual quality."
+    },
+    {
+      "variation_id": 5,
+      "decision": "rejected",
+      "reason": "Tint changes the intended mood too much."
+    }
+  ],
+  "summary": "The user accepted variation(s): 1, 2, 4. The user rejected variation(s): 3, 5. The final selection reflects the recorded accept/reject feedback and should be used as the decision trace for this session. User notes: Variation 1: Best balance between realism and fidelity. | Variation 2: Useful color style for presentation. | Variation 3: Too flat compared with the original. | Variation 4: Sharper details improve visual quality. | Variation 5: Tint changes the intended mood too much."
+}

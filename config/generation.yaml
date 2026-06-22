@@ -1,0 +1,40 @@
+dataset:
+  recommended: "AFHQ v2 subset"
+  reason: "Animal faces avoid identity-manipulation risk while still supporting pose, lighting, texture, and style variation analysis."
+  fallback: "A small self-collected object or product image set with clear consent and license notes."
+
+generation:
+  model_id: "runwayml/stable-diffusion-v1-5"
+  image_size: 512
+  num_inference_steps: 28
+  device: "cuda"
+  precision: "float16"
+  notes: "Designed for an RTX 3060 Ti 8GB using attention slicing and VAE slicing."
+
+variations:
+  - label: "Natural lighting"
+    prompt: "high quality image, natural lighting, realistic texture, faithful structure, clean background"
+    strength: 0.42
+    guidance_scale: 7.0
+    seed_offset: 1
+  - label: "Editorial color"
+    prompt: "high quality editorial color grading, polished lighting, faithful structure, detailed subject"
+    strength: 0.48
+    guidance_scale: 7.3
+    seed_offset: 2
+  - label: "Clean contrast"
+    prompt: "high quality image with balanced contrast, clear subject separation, faithful structure"
+    strength: 0.50
+    guidance_scale: 7.5
+    seed_offset: 3
+  - label: "Sharpened detail"
+    prompt: "high quality detailed rendering, refined edges, realistic texture, faithful subject identity"
+    strength: 0.54
+    guidance_scale: 7.7
+    seed_offset: 4
+  - label: "Cinematic tint"
+    prompt: "high quality cinematic lighting, subtle color tint, realistic image, faithful composition"
+    strength: 0.58
+    guidance_scale: 8.0
+    seed_offset: 5
+
