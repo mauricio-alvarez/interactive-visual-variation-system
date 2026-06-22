@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     disable_safety_checker: bool = True
     explainer_provider: str = "rule"
     local_llm_model_id: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_image_model: str = "gpt-image-2"
+    openai_image_size: str = "1024x1024"
+    openai_image_quality: str = "medium"
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",

@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Local AI photo editor</p>
+          <p class="eyebrow">AI photo editor</p>
           <h1>{{ project_name }}</h1>
         </div>
         <div class="status-stack">
@@ -38,6 +38,10 @@
                 <label>
                   <input type="radio" name="mode" value="diffusion" />
                   <span>GPU studio</span>
+                </label>
+                <label>
+                  <input type="radio" name="mode" value="api" />
+                  <span>API studio</span>
                 </label>
               </div>
             </div>
@@ -82,7 +86,7 @@
                 <h2>Studio Notes</h2>
                 <span id="decision-count">0 of 5 selected</span>
               </div>
-              <p id="summary">Use Preview mode to test the interface without loading the model. Switch to GPU studio when you are ready to generate final portrait edits.</p>
+              <p id="summary">Use Preview mode to test the interface. Use API studio for the strongest portrait edits, or GPU studio when you want to keep generation local.</p>
             </div>
           </div>
 
@@ -110,11 +114,11 @@
       let currentVariations = [];
 
       const sampleVariations = [
-        { id: 1, label: "Natural lighting", image_url: "/examples/session_001/variation_1.png", seed: 4201, strength: 0.28, face_preservation: true, detected_faces: 1 },
-        { id: 2, label: "Cinematic tint", image_url: "/examples/session_001/variation_2.png", seed: 4202, strength: 0.32, face_preservation: true, detected_faces: 1 },
-        { id: 3, label: "Studio headshot", image_url: "/examples/session_001/variation_3.png", seed: 4203, strength: 0.3, face_preservation: true, detected_faces: 1 },
-        { id: 4, label: "Editorial polish", image_url: "/examples/session_001/variation_4.png", seed: 4204, strength: 0.34, face_preservation: true, detected_faces: 1 },
-        { id: 5, label: "Soft luxury retouch", image_url: "/examples/session_001/variation_5.png", seed: 4205, strength: 0.26, face_preservation: true, detected_faces: 1 },
+        { id: 1, label: "Natural lighting", provider: "preview", image_url: "/examples/session_001/variation_1.png", seed: 4201, strength: 0.28, face_preservation: true, detected_faces: 1 },
+        { id: 2, label: "Cinematic tint", provider: "preview", image_url: "/examples/session_001/variation_2.png", seed: 4202, strength: 0.32, face_preservation: true, detected_faces: 1 },
+        { id: 3, label: "Studio headshot", provider: "preview", image_url: "/examples/session_001/variation_3.png", seed: 4203, strength: 0.3, face_preservation: true, detected_faces: 1 },
+        { id: 4, label: "Editorial polish", provider: "preview", image_url: "/examples/session_001/variation_4.png", seed: 4204, strength: 0.34, face_preservation: true, detected_faces: 1 },
+        { id: 5, label: "Soft luxury retouch", provider: "preview", image_url: "/examples/session_001/variation_5.png", seed: 4205, strength: 0.26, face_preservation: true, detected_faces: 1 },
       ];
 
       async function loadHealth() {
@@ -122,7 +126,8 @@
           const response = await fetch("/api/health");
           const data = await response.json();
           const gpu = data.cuda_available ? data.gpu_name : "GPU unavailable";
-          document.getElementById("health").textContent = `${data.device} | ${gpu}`;
+          const api = data.api_key_configured ? `${data.api_image_model} ready` : "API key missing";
+          document.getElementById("health").textContent = `${data.device} | ${gpu} | ${api}`;
         } catch {
           document.getElementById("health").textContent = "Runtime unavailable";
         }
@@ -158,6 +163,7 @@
         container.innerHTML = "";
         variations.forEach((item) => {
           const faceText = item.face_preservation ? `Face lock: ${item.detected_faces ?? 0}` : "Face lock off";
+          const provider = item.provider ?? "local";
           const card = document.createElement("article");
           card.className = "look-card";
           card.innerHTML = `
@@ -167,7 +173,7 @@
                 <h3>${item.label}</h3>
                 <span>#${item.id}</span>
               </div>
-              <p>${faceText} · strength ${item.strength} · seed ${item.seed}</p>
+              <p>${provider} | ${faceText} | strength ${item.strength} | seed ${item.seed}</p>
               <div class="choice-row" role="radiogroup" aria-label="Decision for ${item.label}">
                 <label><input type="radio" name="decision-${item.id}" value="accepted" ${interactive ? "" : "disabled"} /> <span>Keep</span></label>
                 <label><input type="radio" name="decision-${item.id}" value="rejected" ${interactive ? "" : "disabled"} /> <span>Pass</span></label>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -23,6 +24,10 @@ explainer = DecisionExplanationAgent()
 app.mount("/static", StaticFiles(directory=PROJECT_ROOT / "app" / "static"), name="static")
 app.mount("/outputs", StaticFiles(directory=PROJECT_ROOT / "outputs"), name="outputs")
 app.mount("/examples", StaticFiles(directory=PROJECT_ROOT / "examples"), name="examples")
+
+
+def _openai_key_configured() -> bool:
+    return bool(settings.openai_api_key or os.getenv("OPENAI_API_KEY"))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -53,6 +58,9 @@ def health():
         "device": settings.device,
         "cuda_available": cuda_available,
         "gpu_name": gpu_name,
+        "api_provider": "openai",
+        "api_key_configured": _openai_key_configured(),
+        "api_image_model": settings.openai_image_model,
     }
 
 
@@ -63,8 +71,13 @@ async def generate(
     base_seed: int = Form(4200),
     preserve_faces: bool = Form(True),
 ):
-    if mode not in {"diffusion", "demo"}:
-        raise HTTPException(status_code=400, detail="mode must be diffusion or demo")
+    if mode not in {"diffusion", "demo", "api"}:
+        raise HTTPException(status_code=400, detail="mode must be diffusion, demo, or api")
+    if mode == "api" and not _openai_key_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="API studio requires OPENAI_API_KEY or VISGEN_OPENAI_API_KEY.",
+        )
 
     session_id, session_dir = store.create_session()
     input_path = await store.save_upload(image, session_dir)

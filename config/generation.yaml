@@ -9,31 +9,31 @@ generation:
   num_inference_steps: 28
   device: "cuda"
   precision: "float16"
-  notes: "Designed for an RTX 3060 Ti 8GB. Portrait presets use conservative img2img strengths to preserve facial geometry."
+  notes: "Designed for an RTX 3060 Ti 8GB. API studio is the preferred production path when stronger, more distinct portrait edits are required."
 
 variations:
   - label: "Natural lighting"
-    prompt: "professional portrait photo, natural window lighting, realistic skin texture, same face, same identity, sharp eyes, clean background, 85mm lens, subtle retouching"
-    strength: 0.28
+    prompt: "bright window-lit professional lifestyle portrait, airy daylight, soft neutral background, realistic skin texture, same face, same identity, sharp eyes, 85mm lens, subtle natural retouching"
+    strength: 0.36
     guidance_scale: 6.7
     seed_offset: 1
   - label: "Cinematic tint"
-    prompt: "professional portrait photo, cinematic color tint, soft rim light, same face, same identity, realistic skin texture, sharp eyes, elegant studio mood"
-    strength: 0.32
+    prompt: "low-key cinematic portrait, teal and warm amber color grade, soft rim light, darker textured background, same face, same identity, realistic skin texture, sharp eyes, film still mood"
+    strength: 0.42
     guidance_scale: 7.0
     seed_offset: 2
   - label: "Studio headshot"
-    prompt: "professional studio headshot, softbox lighting, clean neutral background, same face, same identity, natural expression, sharp eyes, realistic skin, premium LinkedIn photo"
-    strength: 0.30
+    prompt: "commercial studio headshot, clean softbox catchlights, seamless gray backdrop, crisp business portrait, same face, same identity, natural expression, sharp eyes, realistic skin"
+    strength: 0.34
     guidance_scale: 7.1
     seed_offset: 3
   - label: "Editorial polish"
-    prompt: "professional editorial portrait, refined color grading, balanced contrast, same face, same identity, realistic skin pores, sharp eyes, magazine-quality lighting"
-    strength: 0.34
+    prompt: "fashion magazine editorial portrait, directional key light, refined contrast, sophisticated background depth, same face, same identity, realistic skin pores, sharp eyes, premium color grading"
+    strength: 0.44
     guidance_scale: 7.2
     seed_offset: 4
   - label: "Soft luxury retouch"
-    prompt: "professional luxury portrait retouch, soft flattering light, same face, same identity, natural skin texture, no plastic skin, elegant background, premium photographer style"
-    strength: 0.26
+    prompt: "high-end beauty portrait, soft clamshell lighting, luminous but natural skin, elegant warm neutral background, same face, same identity, no plastic skin, premium campaign style"
+    strength: 0.33
     guidance_scale: 6.8
     seed_offset: 5

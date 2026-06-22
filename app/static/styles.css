@@ -161,7 +161,7 @@ h3 {
 
 .segmented {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
   padding: 4px;
   border: 1px solid #c9d3db;

@@ -15,6 +15,7 @@ Diversity:
 
 - Pairwise inverse SSIM between the five generated images.
 - Optional CLIP embedding distance if time permits.
+- Provider comparison: Preview, GPU studio, and API studio should be scored separately. API studio should become the default production provider if it gives clearer lighting, background, and mood separation while preserving identity.
 
 Input fidelity:
 
@@ -27,6 +28,12 @@ Face preservation:
 - Detected face count in the JSON record.
 - Human rating for identity preservation.
 - Count of visible face artifacts per output.
+
+Provider gate:
+
+- Reject a provider preset if at least three of the five looks feel interchangeable.
+- Reject a provider preset if the edited face no longer looks like the uploaded person.
+- Prefer API studio for production when the local GPU provider cannot satisfy both diversity and identity preservation.
 
 Decision consistency:
 

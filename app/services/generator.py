@@ -52,6 +52,8 @@ class ImageVariationGenerator:
     ) -> list[dict[str, Any]]:
         if mode == "demo":
             return self._generate_demo_variations(input_path, output_dir, base_seed, preserve_faces)
+        if mode == "api":
+            return self._generate_openai_variations(input_path, output_dir, base_seed, preserve_faces)
         return self._generate_diffusion_variations(input_path, output_dir, base_seed, preserve_faces)
 
     def _load_pipeline(self):
@@ -134,7 +136,63 @@ class ImageVariationGenerator:
 
             out_path = output_dir / f"variation_{idx}.png"
             generated.save(out_path)
-            results.append(self._metadata(idx, out_path, seed, style, preserve_faces, face_count))
+            results.append(self._metadata(idx, out_path, seed, style, preserve_faces, face_count, "local-gpu"))
+        return results
+
+    def _generate_openai_variations(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        base_seed: int,
+        preserve_faces: bool,
+    ) -> list[dict[str, Any]]:
+        import base64
+        import os
+
+        import httpx
+
+        api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY or VISGEN_OPENAI_API_KEY is required for API studio mode.")
+
+        prepared = self._prepare_image(input_path)
+        api_input = output_dir / "api_input.png"
+        prepared.save(api_input)
+        image_bytes = api_input.read_bytes()
+
+        headers = {"Authorization": f"Bearer {api_key}"}
+        results: list[dict[str, Any]] = []
+        with httpx.Client(timeout=180) as client:
+            for idx, style in enumerate(self.styles, start=1):
+                seed = base_seed + style.seed_offset
+                prompt = self._api_edit_prompt(style, idx)
+                files = [("image[]", ("portrait.png", image_bytes, "image/png"))]
+                data = {
+                    "model": settings.openai_image_model,
+                    "prompt": prompt,
+                    "size": settings.openai_image_size,
+                    "quality": settings.openai_image_quality,
+                }
+                response = client.post(
+                    f"{settings.openai_base_url.rstrip('/')}/images/edits",
+                    headers=headers,
+                    data=data,
+                    files=files,
+                )
+                if response.status_code >= 400:
+                    raise RuntimeError(f"OpenAI image edit failed: {response.status_code} {response.text}")
+
+                payload = response.json()
+                data_items = payload.get("data") or []
+                if not data_items or not data_items[0].get("b64_json"):
+                    raise RuntimeError("OpenAI image edit returned no image data.")
+                b64_json = data_items[0]["b64_json"]
+                image_data = base64.b64decode(b64_json)
+                out_path = output_dir / f"variation_{idx}.png"
+                out_path.write_bytes(image_data)
+                face_count = len(self._detect_faces(prepared)) if preserve_faces else 0
+                results.append(self._metadata(idx, out_path, seed, style, preserve_faces, face_count, "openai-api"))
+
         return results
 
     def _generate_demo_variations(
@@ -161,9 +219,28 @@ class ImageVariationGenerator:
                 generated, face_count = self._preserve_faces(image, generated)
             generated.save(out_path)
             results.append(
-                self._metadata(idx, out_path, base_seed + style.seed_offset, style, preserve_faces, face_count)
+                self._metadata(
+                    idx,
+                    out_path,
+                    base_seed + style.seed_offset,
+                    style,
+                    preserve_faces,
+                    face_count,
+                    "preview",
+                )
             )
         return results
+
+    def _api_edit_prompt(self, style: VariationStyle, idx: int) -> str:
+        return (
+            "Edit the uploaded portrait into a professional photography result. "
+            f"Studio look {idx}: {style.label}. {style.prompt}. "
+            "Make this output visibly distinct from the other studio looks through lighting, "
+            "color grade, background treatment, and photographic mood. Preserve the person's "
+            "identity, facial structure, eye shape, nose, mouth, age, and natural skin texture. "
+            "Do not beautify by changing identity. Avoid warped eyes, altered teeth, plastic skin, "
+            "extra facial features, or artificial-looking retouching."
+        )
 
     def _natural_lighting(self, image: Image.Image) -> Image.Image:
         image = ImageEnhance.Brightness(image).enhance(1.12)
@@ -172,8 +249,9 @@ class ImageVariationGenerator:
 
     def _cinematic_tint(self, image: Image.Image) -> Image.Image:
         overlay = Image.new("RGB", image.size, (18, 32, 46))
-        blended = Image.blend(image, overlay, alpha=0.14)
-        return ImageEnhance.Contrast(blended).enhance(1.1)
+        blended = Image.blend(image, overlay, alpha=0.22)
+        blended = ImageEnhance.Color(blended).enhance(0.92)
+        return ImageEnhance.Contrast(blended).enhance(1.16)
 
     def _studio_headshot(self, image: Image.Image) -> Image.Image:
         image = ImageOps.autocontrast(image)
@@ -181,14 +259,18 @@ class ImageVariationGenerator:
         return image.filter(ImageFilter.UnsharpMask(radius=1.4, percent=125))
 
     def _editorial_polish(self, image: Image.Image) -> Image.Image:
-        image = ImageEnhance.Color(image).enhance(1.18)
-        image = ImageEnhance.Contrast(image).enhance(1.12)
+        cool = Image.new("RGB", image.size, (30, 38, 52))
+        image = Image.blend(image, cool, alpha=0.08)
+        image = ImageEnhance.Color(image).enhance(1.24)
+        image = ImageEnhance.Contrast(image).enhance(1.18)
         return image.filter(ImageFilter.UnsharpMask(radius=1.2, percent=110))
 
     def _soft_luxury_retouch(self, image: Image.Image) -> Image.Image:
         softened = image.filter(ImageFilter.GaussianBlur(radius=0.55))
         image = Image.blend(image, softened, alpha=0.18)
-        image = ImageEnhance.Brightness(image).enhance(1.08)
+        warm = Image.new("RGB", image.size, (244, 228, 206))
+        image = Image.blend(image, warm, alpha=0.1)
+        image = ImageEnhance.Brightness(image).enhance(1.1)
         return ImageEnhance.Contrast(image).enhance(1.04)
 
     def _studio_finish(self, image: Image.Image) -> Image.Image:
@@ -244,12 +326,14 @@ class ImageVariationGenerator:
         style: VariationStyle,
         preserve_faces: bool,
         detected_faces: int,
+        provider: str,
     ) -> dict[str, Any]:
         return {
             "id": idx,
             "image_path": str(path),
             "seed": seed,
             "label": style.label,
+            "provider": provider,
             "prompt": style.prompt,
             "strength": style.strength,
             "guidance_scale": style.guidance_scale,

@@ -4,7 +4,9 @@ FastAPI project for the advanced version of UTEC Project 2. The app works as a l
 
 ## Current design
 
-- Local GPU-first generation with Stable Diffusion img2img through `diffusers`.
+- Provider switch with Preview, local GPU studio, and API studio modes.
+- Local GPU generation with Stable Diffusion img2img through `diffusers`.
+- API studio generation through OpenAI image edits when `OPENAI_API_KEY` or `VISGEN_OPENAI_API_KEY` is configured.
 - RTX 3060 Ti friendly defaults: 512x512, fp16, 28 steps, attention slicing.
 - Five studio presets from `config/generation.yaml`: natural lighting, cinematic tint, studio headshot, editorial polish, and soft luxury retouch.
 - Face lock: optional OpenCV face detection plus soft facial-region blending to reduce identity drift and malformed faces.
@@ -35,7 +37,17 @@ python -m venv .venv
 
 Open `http://127.0.0.1:8001`.
 
-Use `GPU studio` for the real local GPU path. Use `Fast demo` only for UI testing and documentation screenshots.
+Use `Preview` for UI testing and documentation screenshots. Use `GPU studio` for the local CUDA path. Use `API studio` when you need stronger, more distinct professional portrait edits.
+
+API studio reads these optional settings from `.env` or the deployment environment:
+
+```text
+OPENAI_API_KEY=
+VISGEN_OPENAI_API_KEY=
+VISGEN_OPENAI_IMAGE_MODEL=gpt-image-2
+VISGEN_OPENAI_IMAGE_SIZE=1024x1024
+VISGEN_OPENAI_IMAGE_QUALITY=medium
+```
 
 The local default disables the built-in Stable Diffusion safety checker because it can false-positive on the non-human classroom demo images. Re-enable it with `VISGEN_DISABLE_SAFETY_CHECKER=false` before accepting unknown, public, or human-subject uploads.
 
@@ -66,4 +78,4 @@ docker build -t ai-portrait-studio .
 docker run --rm -p 8000:8000 ai-portrait-studio
 ```
 
-GPU studio deployment needs a CUDA host, the GPU PyTorch wheel, and local model weights. See `docs/deployment.md`.
+API studio deployment needs an OpenAI API key. GPU studio deployment needs a CUDA host, the GPU PyTorch wheel, and local model weights. See `docs/deployment.md`.

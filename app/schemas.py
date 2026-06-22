@@ -7,6 +7,7 @@ class VariationInfo(BaseModel):
     image_path: str
     seed: int
     label: str
+    provider: str = "local"
     prompt: str
     strength: float
     guidance_scale: float

@@ -11,4 +11,4 @@ opencv-python==4.13.0.92
 scikit-image==0.26.0
 scikit-learn==1.9.0
 pandas==3.0.3
-
+httpx==0.28.1
