@@ -84,6 +84,7 @@ huggingface-cli login
 - `docs/evaluation.md`
 - `docs/ethics.md`
 - `docs/face_preservation.md`
+- `docs/model_finetuning_plan.md`
 
 ## Deployment
 

@@ -28,10 +28,10 @@ Fallback dataset:
 
 Primary route:
 
-- Start from `runwayml/stable-diffusion-v1-5`.
-- Use img2img for input-conditioned generation.
-- Add LoRA fine-tuning on the selected dataset if time permits.
-- Keep LoRA rank small, for example 4 or 8, to fit an 8 GB GPU.
+- Keep `runwayml/stable-diffusion-v1-5` only as the local proof-of-training baseline.
+- Use SDXL LoRA for the production fine-tuned studio path when 24 GB or larger GPU training is available.
+- Add a face-reference conditioning layer for identity preservation instead of relying on style fine-tuning alone.
+- Keep LoRA rank small for local experiments, for example 4 or 8, to fit an 8 GB GPU.
 
 Recommended generation defaults:
 
@@ -49,3 +49,5 @@ Recommended generation defaults:
 - What attributes should be preserved, especially facial identity and eye/mouth geometry.
 - Training or adaptation settings.
 - Failure cases: over-editing, low diversity, artifacts, identity drift, or prompt mismatch.
+
+See `docs/model_finetuning_plan.md` for the full fine-tuning dataset, training, and evaluation plan.
