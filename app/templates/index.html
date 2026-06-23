@@ -43,6 +43,10 @@
                   <input type="radio" name="mode" value="api" />
                   <span>API studio</span>
                 </label>
+                <label>
+                  <input type="radio" name="mode" value="finetuned" />
+                  <span>Fine-tuned</span>
+                </label>
               </div>
             </div>
 
@@ -86,7 +90,7 @@
                 <h2>Studio Notes</h2>
                 <span id="decision-count">0 of 5 selected</span>
               </div>
-              <p id="summary">Use Preview mode to test the interface. Use API studio for the strongest portrait edits, or GPU studio when you want to keep generation local.</p>
+              <p id="summary">Use Preview mode to test the interface. Use Fine-tuned studio after training local portrait weights, API studio for production edits, or GPU studio for the base CUDA path.</p>
             </div>
           </div>
 
@@ -127,7 +131,8 @@
           const data = await response.json();
           const gpu = data.cuda_available ? data.gpu_name : "GPU unavailable";
           const api = data.api_key_configured ? `${data.api_image_model} ready` : "API key missing";
-          document.getElementById("health").textContent = `${data.device} | ${gpu} | ${api}`;
+          const tuned = data.finetuned_ready ? "fine-tuned ready" : "fine-tuned missing";
+          document.getElementById("health").textContent = `${data.device} | ${gpu} | ${api} | ${tuned}`;
         } catch {
           document.getElementById("health").textContent = "Runtime unavailable";
         }

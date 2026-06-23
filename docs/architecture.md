@@ -27,12 +27,16 @@ flowchart LR
 ## Runtime modules
 
 - `app/main.py`: FastAPI endpoints and web UI wiring.
-- `app/services/generator.py`: provider switch, CUDA diffusion generator, OpenAI image-edit provider, demo-mode studio transforms, and face-preservation pass.
+- `app/services/generator.py`: provider switch, CUDA diffusion generator, fine-tuned LoRA/IP-Adapter-ready generator, OpenAI image-edit provider, demo-mode studio transforms, and face-preservation pass.
 - `app/services/storage.py`: session folders and JSON records.
 - `app/services/explainer.py`: faithful explanation agent based on stored decisions.
 - `app/services/evaluation.py`: starter diversity metric.
 - `frontend/src`: React, TypeScript, Tailwind, and shadcn-style studio interface. FastAPI serves `frontend/dist` when it exists.
 - `config/generation.yaml`: selected dataset, model, and five generation parameter sets.
+- `config/finetuning.yaml`: portrait fine-tuning dataset, LoRA profile, identity adapter, validation prompt, and acceptance-gate settings.
+- `scripts/prepare_portrait_dataset.py`: local portrait curation, face crop, quality filtering, split creation, and metadata export.
+- `scripts/launch_lora_training.py`: dry-run or executable Diffusers Accelerate command builder for SD 1.5 and SDXL LoRA training.
+- `scripts/evaluate_portrait_outputs.py`: session-level diversity and face-stability evaluation report.
 
 ## Session contract
 

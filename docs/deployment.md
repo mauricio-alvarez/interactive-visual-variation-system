@@ -71,6 +71,25 @@ Then place or download model weights under `models/` and set:
 VISGEN_DEVICE=cuda
 ```
 
+## Fine-Tuned Studio Deployment
+
+Fine-tuned studio is disabled until weights or an identity adapter are configured:
+
+```text
+VISGEN_FINETUNED_MODEL_ID=runwayml/stable-diffusion-v1-5
+VISGEN_FINETUNED_LORA_PATH=models/lora/portrait_sd15_local
+VISGEN_FINETUNED_LORA_WEIGHT_NAME=pytorch_lora_weights.safetensors
+VISGEN_IP_ADAPTER_ENABLED=true
+```
+
+Use `VISGEN_FINETUNED_ALLOW_BASE=true` only for local debugging. It enables the mode without trained weights and should not be treated as production quality.
+
+Training dependencies are intentionally separate from runtime dependencies:
+
+```powershell
+pip install -r requirements-training.txt
+```
+
 ## Production Checklist
 
 - Use HTTPS behind a reverse proxy or managed platform.

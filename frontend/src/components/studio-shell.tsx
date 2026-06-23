@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-type Mode = 'demo' | 'diffusion' | 'api';
+type Mode = 'demo' | 'diffusion' | 'api' | 'finetuned';
 type Decision = 'accepted' | 'rejected' | '';
 
 type Health = {
@@ -28,6 +28,9 @@ type Health = {
   gpu_name: string;
   api_key_configured: boolean;
   api_image_model: string;
+  finetuned_ready: boolean;
+  finetuned_model_id: string;
+  identity_adapter_enabled: boolean;
 };
 
 type Variation = {
@@ -46,6 +49,7 @@ type DecisionState = Record<number, { decision: Decision; reason: string }>;
 const modes: Array<{ value: Mode; label: string; detail: string; icon: typeof Sparkles }> = [
   { value: 'demo', label: 'Preview', detail: 'Fast interface pass', icon: Sparkles },
   { value: 'api', label: 'API studio', detail: 'Production edits', icon: Cloud },
+  { value: 'finetuned', label: 'Fine-tuned studio', detail: 'LoRA + identity guide', icon: Sparkles },
   { value: 'diffusion', label: 'GPU studio', detail: 'Local CUDA run', icon: Cpu },
 ];
 
@@ -385,6 +389,18 @@ export function StudioShell() {
                   <span>API</span>
                   <span className={cn('text-right', health?.api_key_configured ? 'text-accent' : 'text-muted-foreground')}>
                     {health?.api_key_configured ? `${health.api_image_model} ready` : 'Key missing'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>Fine-tuned</span>
+                  <span className={cn('text-right', health?.finetuned_ready ? 'text-accent' : 'text-muted-foreground')}>
+                    {health?.finetuned_ready ? 'Ready' : 'Weights missing'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>Identity</span>
+                  <span className={cn('text-right', health?.identity_adapter_enabled ? 'text-accent' : 'text-muted-foreground')}>
+                    {health?.identity_adapter_enabled ? 'Adapter on' : 'Face lock only'}
                   </span>
                 </div>
                 <div className="flex justify-between gap-3">

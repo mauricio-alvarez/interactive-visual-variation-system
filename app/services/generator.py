@@ -24,6 +24,7 @@ class ImageVariationGenerator:
 
     def __init__(self):
         self._pipeline = None
+        self._finetuned_pipeline = None
         self.styles = self._load_styles()
 
     def _load_styles(self) -> list[VariationStyle]:
@@ -54,7 +55,12 @@ class ImageVariationGenerator:
             return self._generate_demo_variations(input_path, output_dir, base_seed, preserve_faces)
         if mode == "api":
             return self._generate_openai_variations(input_path, output_dir, base_seed, preserve_faces)
+        if mode == "finetuned":
+            return self._generate_finetuned_variations(input_path, output_dir, base_seed, preserve_faces)
         return self._generate_diffusion_variations(input_path, output_dir, base_seed, preserve_faces)
+
+    def finetuned_configured(self) -> bool:
+        return bool(settings.finetuned_allow_base or settings.finetuned_lora_path or settings.ip_adapter_enabled)
 
     def _load_pipeline(self):
         if self._pipeline is not None:
@@ -86,6 +92,55 @@ class ImageVariationGenerator:
             pipe.load_lora_weights(settings.lora_path)
 
         self._pipeline = pipe
+        return pipe
+
+    def _load_finetuned_pipeline(self):
+        if self._finetuned_pipeline is not None:
+            return self._finetuned_pipeline
+
+        import torch
+        from diffusers import StableDiffusionImg2ImgPipeline
+
+        if not self.finetuned_configured():
+            raise RuntimeError(
+                "Fine-tuned studio requires VISGEN_FINETUNED_LORA_PATH, "
+                "VISGEN_IP_ADAPTER_ENABLED=true, or VISGEN_FINETUNED_ALLOW_BASE=true."
+            )
+
+        if settings.device == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("CUDA was requested, but torch.cuda.is_available() is false.")
+
+        dtype = torch.float16 if settings.device == "cuda" else torch.float32
+        kwargs: dict[str, Any] = {
+            "torch_dtype": dtype,
+            "use_safetensors": True,
+        }
+        if settings.disable_safety_checker:
+            kwargs["safety_checker"] = None
+            kwargs["requires_safety_checker"] = False
+
+        local_model = PROJECT_ROOT / "models" / settings.finetuned_model_id.replace("/", "__")
+        model_source = str(local_model) if local_model.exists() else settings.finetuned_model_id
+        pipe = StableDiffusionImg2ImgPipeline.from_pretrained(model_source, **kwargs)
+        pipe = pipe.to(settings.device)
+        pipe.enable_attention_slicing()
+        pipe.enable_vae_slicing()
+
+        if settings.finetuned_lora_path:
+            lora_kwargs = {}
+            if settings.finetuned_lora_weight_name:
+                lora_kwargs["weight_name"] = settings.finetuned_lora_weight_name
+            pipe.load_lora_weights(settings.finetuned_lora_path, **lora_kwargs)
+
+        if settings.ip_adapter_enabled:
+            pipe.load_ip_adapter(
+                settings.ip_adapter_repo,
+                subfolder=settings.ip_adapter_subfolder,
+                weight_name=settings.ip_adapter_weight_name,
+            )
+            pipe.set_ip_adapter_scale(settings.ip_adapter_scale)
+
+        self._finetuned_pipeline = pipe
         return pipe
 
     def _prepare_image(self, path: Path) -> Image.Image:
@@ -195,6 +250,53 @@ class ImageVariationGenerator:
 
         return results
 
+    def _generate_finetuned_variations(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        base_seed: int,
+        preserve_faces: bool,
+    ) -> list[dict[str, Any]]:
+        import torch
+
+        pipe = self._load_finetuned_pipeline()
+        image = self._prepare_image(input_path)
+        negative_prompt = (
+            "low quality, blurry, distorted face, changed identity, deformed eyes, "
+            "asymmetrical face, malformed mouth, plastic skin, waxy skin, artifacts, "
+            "watermark, text, extra facial features, bad teeth, oversaturated"
+        )
+
+        results: list[dict[str, Any]] = []
+        for idx, style in enumerate(self.styles, start=1):
+            seed = base_seed + style.seed_offset
+            generator = torch.Generator(device=settings.device).manual_seed(seed)
+            call_kwargs: dict[str, Any] = {
+                "prompt": self._finetuned_prompt(style, idx),
+                "negative_prompt": negative_prompt,
+                "image": image,
+                "strength": max(style.strength, 0.42),
+                "guidance_scale": max(style.guidance_scale, 7.0),
+                "num_inference_steps": settings.finetuned_steps,
+                "generator": generator,
+            }
+            if settings.ip_adapter_enabled:
+                call_kwargs["ip_adapter_image"] = image
+            if settings.finetuned_lora_path:
+                call_kwargs["cross_attention_kwargs"] = {"scale": settings.finetuned_lora_scale}
+
+            result = pipe(**call_kwargs)
+            generated = result.images[0].convert("RGB")
+            face_count = 0
+            if preserve_faces:
+                generated, face_count = self._preserve_faces(image, generated)
+            generated = self._studio_finish(generated)
+
+            out_path = output_dir / f"variation_{idx}.png"
+            generated.save(out_path)
+            results.append(self._metadata(idx, out_path, seed, style, preserve_faces, face_count, "fine-tuned-local"))
+        return results
+
     def _generate_demo_variations(
         self,
         input_path: Path,
@@ -242,6 +344,13 @@ class ImageVariationGenerator:
             "extra facial features, or artificial-looking retouching."
         )
 
+    def _finetuned_prompt(self, style: VariationStyle, idx: int) -> str:
+        return (
+            f"portrait_studio_lora look {idx}, {style.prompt}, professional photography, "
+            "recognizable same person, natural skin texture, sharp eyes, realistic face geometry, "
+            "cinematic but natural lighting, production-quality retouching"
+        )
+
     def _natural_lighting(self, image: Image.Image) -> Image.Image:
         image = ImageEnhance.Brightness(image).enhance(1.12)
         image = ImageEnhance.Contrast(image).enhance(1.06)
@@ -279,16 +388,28 @@ class ImageVariationGenerator:
         return image
 
     def _preserve_faces(self, source: Image.Image, generated: Image.Image) -> tuple[Image.Image, int]:
-        boxes = self._detect_faces(source)
-        if not boxes:
+        source_boxes = self._detect_faces(source)
+        if not source_boxes:
             return generated, 0
 
+        generated_boxes = self._detect_faces(generated)
         result = generated.copy()
-        for box in boxes:
-            mask = self._face_mask(source.size, box)
-            face_layer = Image.composite(source, result, mask)
-            result = Image.blend(result, face_layer, alpha=0.64)
-        return result, len(boxes)
+        for source_box in source_boxes:
+            target_box = self._best_matching_box(source_box, generated_boxes) or source_box
+            source_crop_box = self._expanded_box(source.size, source_box, pad_x=0.22, pad_y=0.18)
+            target_crop_box = self._expanded_box(generated.size, target_box, pad_x=0.22, pad_y=0.18)
+            left, top, right, bottom = target_crop_box
+            if right <= left or bottom <= top:
+                continue
+
+            source_crop = source.crop(source_crop_box)
+            source_crop = source_crop.resize((right - left, bottom - top), Image.Resampling.LANCZOS)
+            face_canvas = result.copy()
+            face_canvas.paste(source_crop, (left, top))
+            mask = self._face_mask(generated.size, target_box)
+            face_layer = Image.composite(face_canvas, result, mask)
+            result = Image.blend(result, face_layer, alpha=settings.face_lock_blend)
+        return result, len(source_boxes)
 
     def _detect_faces(self, image: Image.Image) -> list[tuple[int, int, int, int]]:
         import cv2
@@ -304,19 +425,48 @@ class ImageVariationGenerator:
         return [(int(x), int(y), int(w), int(h)) for x, y, w, h in faces]
 
     def _face_mask(self, size: tuple[int, int], box: tuple[int, int, int, int]) -> Image.Image:
-        width, height = size
-        x, y, w, h = box
-        pad_x = int(w * 0.22)
-        pad_y = int(h * 0.18)
-        left = max(0, x - pad_x)
-        top = max(0, y - pad_y)
-        right = min(width, x + w + pad_x)
-        bottom = min(height, y + h + pad_y)
+        x, _y, w, _h = box
+        left, top, right, bottom = self._expanded_box(size, box, pad_x=0.22, pad_y=0.18)
 
         mask = Image.new("L", size, 0)
         draw = ImageDraw.Draw(mask)
         draw.rounded_rectangle((left, top, right, bottom), radius=max(24, w // 5), fill=190)
         return mask.filter(ImageFilter.GaussianBlur(radius=max(12, w // 10)))
+
+    def _expanded_box(
+        self,
+        size: tuple[int, int],
+        box: tuple[int, int, int, int],
+        pad_x: float,
+        pad_y: float,
+    ) -> tuple[int, int, int, int]:
+        width, height = size
+        x, y, w, h = box
+        px = int(w * pad_x)
+        py = int(h * pad_y)
+        return (
+            max(0, x - px),
+            max(0, y - py),
+            min(width, x + w + px),
+            min(height, y + h + py),
+        )
+
+    def _best_matching_box(
+        self,
+        source_box: tuple[int, int, int, int],
+        candidates: list[tuple[int, int, int, int]],
+    ) -> tuple[int, int, int, int] | None:
+        if not candidates:
+            return None
+        sx, sy, sw, sh = source_box
+        source_center = (sx + sw / 2, sy + sh / 2)
+
+        def distance(candidate: tuple[int, int, int, int]) -> float:
+            x, y, w, h = candidate
+            center = (x + w / 2, y + h / 2)
+            return (center[0] - source_center[0]) ** 2 + (center[1] - source_center[1]) ** 2
+
+        return min(candidates, key=distance)
 
     def _metadata(
         self,

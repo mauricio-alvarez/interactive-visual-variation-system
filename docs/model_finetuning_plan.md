@@ -256,6 +256,18 @@ Runtime stack:
 - Run face-quality checks.
 - Fall back to API studio when local confidence is low.
 
+Implemented app configuration:
+
+- `VISGEN_FINETUNED_MODEL_ID`
+- `VISGEN_FINETUNED_LORA_PATH`
+- `VISGEN_FINETUNED_LORA_WEIGHT_NAME`
+- `VISGEN_FINETUNED_LORA_SCALE`
+- `VISGEN_IP_ADAPTER_ENABLED`
+- `VISGEN_IP_ADAPTER_REPO`
+- `VISGEN_IP_ADAPTER_SUBFOLDER`
+- `VISGEN_IP_ADAPTER_WEIGHT_NAME`
+- `VISGEN_IP_ADAPTER_SCALE`
+
 ## Evaluation Metrics
 
 Diversity:

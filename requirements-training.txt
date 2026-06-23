@@ -1,0 +1,6 @@
+# Install after requirements-gpu-cu128.txt and requirements.txt on the training machine.
+datasets
+peft
+tensorboard
+tqdm
+wandb

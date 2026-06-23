@@ -4,7 +4,9 @@ __pycache__/
 .env
 models/
 data/raw/
+data/portrait_finetune/
 outputs/sessions/
+reports/
 tmp/
 logs/
 .pytest_cache/

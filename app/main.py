@@ -34,6 +34,10 @@ def _openai_key_configured() -> bool:
     return bool(settings.openai_api_key or os.getenv("OPENAI_API_KEY"))
 
 
+def _finetuned_configured() -> bool:
+    return generator.finetuned_configured()
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     frontend_index = frontend_dist / "index.html"
@@ -69,6 +73,9 @@ def health():
         "api_provider": "openai",
         "api_key_configured": _openai_key_configured(),
         "api_image_model": settings.openai_image_model,
+        "finetuned_ready": _finetuned_configured(),
+        "finetuned_model_id": settings.finetuned_model_id,
+        "identity_adapter_enabled": settings.ip_adapter_enabled,
     }
 
 
@@ -79,12 +86,20 @@ async def generate(
     base_seed: int = Form(4200),
     preserve_faces: bool = Form(True),
 ):
-    if mode not in {"diffusion", "demo", "api"}:
-        raise HTTPException(status_code=400, detail="mode must be diffusion, demo, or api")
+    if mode not in {"diffusion", "demo", "api", "finetuned"}:
+        raise HTTPException(status_code=400, detail="mode must be diffusion, demo, api, or finetuned")
     if mode == "api" and not _openai_key_configured():
         raise HTTPException(
             status_code=400,
             detail="API studio requires OPENAI_API_KEY or VISGEN_OPENAI_API_KEY.",
+        )
+    if mode == "finetuned" and not _finetuned_configured():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Fine-tuned studio requires VISGEN_FINETUNED_LORA_PATH, "
+                "VISGEN_IP_ADAPTER_ENABLED=true, or VISGEN_FINETUNED_ALLOW_BASE=true."
+            ),
         )
 
     session_id, session_dir = store.create_session()

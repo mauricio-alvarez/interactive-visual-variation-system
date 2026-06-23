@@ -24,6 +24,13 @@ Fallback dataset:
 4. Save processed samples in `data/processed` for local experiments.
 5. Document dataset source, license, filters, and known limitations.
 
+The advanced portrait path uses:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\prepare_portrait_dataset.py --profile sd15_local
+.\.venv\Scripts\python.exe scripts\prepare_portrait_dataset.py --profile sdxl_production
+```
+
 ## Advanced model path
 
 Primary route:

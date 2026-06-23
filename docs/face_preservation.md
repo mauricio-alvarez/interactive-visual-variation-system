@@ -13,7 +13,7 @@ The app uses conservative portrait generation settings:
 - Negative prompts for distorted faces, changed identity, deformed eyes, malformed mouth, and plastic skin.
 - Optional face lock enabled by default.
 
-Face lock uses OpenCV frontal-face detection on the prepared input image. For each detected face, the app creates a feathered mask and softly blends the original facial region back into the generated output. This is not a full face restoration model, but it is practical and local.
+Face lock uses OpenCV frontal-face detection on the prepared input image and the generated output. For each detected source face, the app tries to align the original facial region to the nearest generated face box, creates a feathered mask, and softly blends the source face details back into the generated output. If the generated face is not detected, it falls back to the source coordinates. This is not a full face restoration model, but it is practical and local.
 
 ## Why This Helps
 
@@ -23,7 +23,7 @@ The diffusion model can still improve the surrounding image, lighting, color, an
 
 - Haar-cascade detection works best with frontal faces.
 - It may miss side profiles, occluded faces, or very small faces.
-- If the diffusion model moves the head too much, same-coordinate blending can look imperfect.
+- If the diffusion model moves the head too much and the generated face detector fails, fallback blending can look imperfect.
 - Very low-quality source faces still need better restoration, not only preservation.
 
 ## Future Upgrade

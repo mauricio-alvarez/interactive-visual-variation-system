@@ -1,0 +1,80 @@
+project:
+  name: "AI Portrait Studio Fine-Tuning"
+  target: "Professional portrait editor with visible studio variation and recognizable faces"
+  license_policy: "Use consented or explicitly licensed portraits only"
+
+dataset:
+  root: "data/portrait_finetune"
+  raw_dirs:
+    - "data/portrait_finetune/raw/consented"
+    - "data/portrait_finetune/raw/licensed"
+  processed_dir: "data/portrait_finetune/processed"
+  metadata_dir: "data/portrait_finetune/metadata"
+  min_source_size: 768
+  output_size_sd15: 512
+  output_size_sdxl: 1024
+  face_padding: 0.42
+  min_face_ratio: 0.16
+  max_face_ratio: 0.82
+  blur_variance_min: 38.0
+  validation_identity_ratio: 0.15
+  test_identity_ratio: 0.10
+  default_caption: "professional portrait photo, realistic skin texture, sharp eyes, natural retouching, studio photography"
+
+profiles:
+  sd15_local:
+    architecture: "sd15"
+    base_model: "runwayml/stable-diffusion-v1-5"
+    resolution: 512
+    output_dir: "models/lora/portrait_sd15_local"
+    train_script: "train_text_to_image_lora.py"
+    mixed_precision: "fp16"
+    rank: 8
+    train_batch_size: 1
+    gradient_accumulation_steps: 4
+    learning_rate: 0.0001
+    max_train_steps: 4000
+    checkpointing_steps: 500
+    validation_steps: 250
+    seed: 1337
+
+  sdxl_production:
+    architecture: "sdxl"
+    base_model: "stabilityai/stable-diffusion-xl-base-1.0"
+    resolution: 1024
+    output_dir: "models/lora/portrait_sdxl_production"
+    train_script: "train_text_to_image_lora_sdxl.py"
+    mixed_precision: "fp16"
+    rank: 16
+    train_batch_size: 1
+    gradient_accumulation_steps: 8
+    learning_rate: 0.000075
+    max_train_steps: 9000
+    checkpointing_steps: 500
+    validation_steps: 250
+    seed: 1337
+
+identity_adapter:
+  enabled: true
+  strategy: "ip_adapter_face"
+  repo: "h94/IP-Adapter"
+  sd15_subfolder: "models"
+  sd15_weight_name: "ip-adapter-full-face_sd15.bin"
+  sdxl_subfolder: "sdxl_models"
+  sdxl_weight_name: "ip-adapter-plus-face_sdxl_vit-h.safetensors"
+  scale: 0.45
+  note: "Use image guidance for identity; do not train identities into the style LoRA."
+
+validation_prompts:
+  - "professional portrait photo, natural window lighting, soft neutral background, realistic skin texture, sharp eyes, 85mm lens"
+  - "low-key cinematic portrait, teal and warm amber grade, soft rim light, dark textured background, realistic skin"
+  - "commercial studio headshot, clean softbox catchlights, seamless gray background, crisp business portrait"
+  - "fashion editorial portrait, directional key light, refined contrast, sophisticated background depth"
+  - "high-end beauty portrait, soft clamshell lighting, luminous natural skin, warm neutral background"
+
+acceptance_gates:
+  min_distinct_looks: 3
+  min_same_identity_rate: 0.85
+  max_severe_face_artifacts_rate: 0.08
+  min_face_detection_rate: 0.95
+  max_api_win_rate_before_local_default: 0.30

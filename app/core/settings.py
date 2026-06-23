@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     openai_image_model: str = "gpt-image-2"
     openai_image_size: str = "1024x1024"
     openai_image_quality: str = "medium"
+    finetuned_model_id: str = "runwayml/stable-diffusion-v1-5"
+    finetuned_lora_path: str = ""
+    finetuned_lora_weight_name: str = ""
+    finetuned_lora_scale: float = 0.85
+    finetuned_allow_base: bool = False
+    finetuned_steps: int = 32
+    ip_adapter_enabled: bool = False
+    ip_adapter_repo: str = "h94/IP-Adapter"
+    ip_adapter_subfolder: str = "models"
+    ip_adapter_weight_name: str = "ip-adapter-full-face_sd15.bin"
+    ip_adapter_scale: float = 0.45
+    face_lock_blend: float = 0.72
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",

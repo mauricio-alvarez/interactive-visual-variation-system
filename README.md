@@ -54,6 +54,7 @@ npm run dev
 ```
 
 Use `Preview` for UI testing and documentation screenshots. Use `GPU studio` for the local CUDA path. Use `API studio` when you need stronger, more distinct professional portrait edits.
+Use `Fine-tuned studio` after training or installing a portrait LoRA and optional IP-Adapter face guidance.
 
 API studio reads these optional settings from `.env` or the deployment environment:
 
@@ -63,6 +64,15 @@ VISGEN_OPENAI_API_KEY=
 VISGEN_OPENAI_IMAGE_MODEL=gpt-image-2
 VISGEN_OPENAI_IMAGE_SIZE=1024x1024
 VISGEN_OPENAI_IMAGE_QUALITY=medium
+```
+
+Fine-tuned studio reads these settings:
+
+```text
+VISGEN_FINETUNED_MODEL_ID=runwayml/stable-diffusion-v1-5
+VISGEN_FINETUNED_LORA_PATH=
+VISGEN_FINETUNED_LORA_WEIGHT_NAME=
+VISGEN_IP_ADAPTER_ENABLED=false
 ```
 
 The local default disables the built-in Stable Diffusion safety checker because it can false-positive on the non-human classroom demo images. Re-enable it with `VISGEN_DISABLE_SAFETY_CHECKER=false` before accepting unknown, public, or human-subject uploads.
@@ -85,6 +95,17 @@ huggingface-cli login
 - `docs/ethics.md`
 - `docs/face_preservation.md`
 - `docs/model_finetuning_plan.md`
+
+## Fine-tuning
+
+The advanced local path is documented and scripted:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\prepare_portrait_dataset.py --profile sd15_local
+.\.venv\Scripts\python.exe scripts\launch_lora_training.py --profile sd15_local
+```
+
+The launcher prints a dry-run Accelerate command by default. Add `--run` on a training machine after installing `requirements-training.txt` and cloning the Diffusers training examples.
 
 ## Deployment
 
