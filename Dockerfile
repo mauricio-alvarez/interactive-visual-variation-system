@@ -1,3 +1,13 @@
+FROM node:22-alpine AS frontend
+
+WORKDIR /frontend
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend ./
+RUN npm run build
+
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -18,6 +28,7 @@ COPY app ./app
 COPY config ./config
 COPY docs ./docs
 COPY examples ./examples
+COPY --from=frontend /frontend/dist ./frontend/dist
 COPY scripts ./scripts
 COPY README.md .
 

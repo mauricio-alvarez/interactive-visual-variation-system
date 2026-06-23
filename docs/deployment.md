@@ -6,6 +6,15 @@ This app is deployable as a FastAPI web service. The default container is UI-fir
 
 ## Local Production Run
 
+Build the React interface first:
+
+```powershell
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
 ```powershell
 .\.venv\Scripts\python.exe scripts\serve.py
 ```
@@ -18,6 +27,8 @@ $env:PORT="8001"
 ```
 
 ## Docker Preview Build
+
+The Dockerfile builds the React frontend in a Node stage and copies the compiled assets into the FastAPI image.
 
 ```powershell
 docker build -t ai-portrait-studio .

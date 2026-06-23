@@ -31,11 +31,27 @@ python -m venv .venv
 
 ## Run
 
+Build the React interface after frontend changes:
+
+```powershell
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
 Open `http://127.0.0.1:8001`.
+
+For frontend-only development, run the Vite server and keep FastAPI on port `8001`:
+
+```powershell
+cd frontend
+npm run dev
+```
 
 Use `Preview` for UI testing and documentation screenshots. Use `GPU studio` for the local CUDA path. Use `API studio` when you need stronger, more distinct professional portrait edits.
 

@@ -9,3 +9,8 @@ tmp/
 logs/
 .pytest_cache/
 .mypy_cache/
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts

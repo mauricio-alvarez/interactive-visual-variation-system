@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 88%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 58%;
+    --accent: 164 94% 48%;
+    --accent-foreground: 0 0% 3%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 0 0% 100% / 0.11;
+    --input: 0 0% 100% / 0.14;
+    --ring: 164 94% 48%;
+    --radius: 0.45rem;
+  }
+
+  .light {
+    --background: 0 0% 96%;
+    --foreground: 0 0% 7%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
+    --primary: 0 0% 8%;
+    --primary-foreground: 0 0% 96%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 90%;
+    --muted-foreground: 0 0% 36%;
+    --accent: 164 70% 36%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 0% / 0.12;
+    --input: 0 0% 0% / 0.14;
+    --ring: 164 70% 36%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    min-height: 100%;
+    background: hsl(var(--background));
+  }
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    overflow-x: hidden;
+    background:
+      radial-gradient(circle at 50% 30%, hsl(0 0% 100% / 0.1), transparent 24rem),
+      radial-gradient(circle at 50% 88%, hsl(164 94% 48% / 0.09), transparent 28rem),
+      hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: Inter, Segoe UI, Arial, sans-serif;
+    letter-spacing: 0;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scanline {
+    background-image: linear-gradient(
+      to bottom,
+      transparent,
+      hsl(0 0% 100% / 0.03) 48%,
+      transparent 52%
+    );
+    background-size: 100% 8px;
+  }
+}

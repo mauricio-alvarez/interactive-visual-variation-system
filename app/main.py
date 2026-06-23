@@ -17,6 +17,8 @@ from app.services.storage import SessionStore, public_output_url
 
 app = FastAPI(title=settings.project_name)
 templates = Jinja2Templates(directory=PROJECT_ROOT / "app" / "templates")
+frontend_dist = PROJECT_ROOT / "frontend" / "dist"
+frontend_assets = frontend_dist / "assets"
 store = SessionStore()
 generator = ImageVariationGenerator()
 explainer = DecisionExplanationAgent()
@@ -24,6 +26,8 @@ explainer = DecisionExplanationAgent()
 app.mount("/static", StaticFiles(directory=PROJECT_ROOT / "app" / "static"), name="static")
 app.mount("/outputs", StaticFiles(directory=PROJECT_ROOT / "outputs"), name="outputs")
 app.mount("/examples", StaticFiles(directory=PROJECT_ROOT / "examples"), name="examples")
+if frontend_assets.exists():
+    app.mount("/assets", StaticFiles(directory=frontend_assets), name="frontend-assets")
 
 
 def _openai_key_configured() -> bool:
@@ -32,6 +36,10 @@ def _openai_key_configured() -> bool:
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
+    frontend_index = frontend_dist / "index.html"
+    if frontend_index.exists():
+        return HTMLResponse(frontend_index.read_text(encoding="utf-8"))
+
     return templates.TemplateResponse(
         request,
         "index.html",

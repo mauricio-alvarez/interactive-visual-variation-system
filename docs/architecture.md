@@ -31,6 +31,7 @@ flowchart LR
 - `app/services/storage.py`: session folders and JSON records.
 - `app/services/explainer.py`: faithful explanation agent based on stored decisions.
 - `app/services/evaluation.py`: starter diversity metric.
+- `frontend/src`: React, TypeScript, Tailwind, and shadcn-style studio interface. FastAPI serves `frontend/dist` when it exists.
 - `config/generation.yaml`: selected dataset, model, and five generation parameter sets.
 
 ## Session contract
