@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -12,6 +13,14 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def accelerate_executable() -> str:
+    executable_name = "accelerate.exe" if os.name == "nt" else "accelerate"
+    candidate = Path(sys.executable).with_name(executable_name)
+    if candidate.exists():
+        return str(candidate)
+    return "accelerate"
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -64,8 +73,16 @@ def build_command(
     report_to: str,
 ) -> list[str]:
     command = [
-        "accelerate",
+        accelerate_executable(),
         "launch",
+        "--num_processes",
+        "1",
+        "--num_machines",
+        "1",
+        "--mixed_precision",
+        str(profile["mixed_precision"]),
+        "--dynamo_backend",
+        "no",
         str(training_script),
         "--pretrained_model_name_or_path",
         str(profile["base_model"]),
@@ -91,8 +108,8 @@ def build_command(
         str(profile["checkpointing_steps"]),
         "--validation_prompt",
         validation_prompt,
-        "--validation_steps",
-        str(profile["validation_steps"]),
+        "--validation_epochs",
+        str(profile["validation_epochs"]),
         "--rank",
         str(profile["rank"]),
         "--mixed_precision",
@@ -104,6 +121,8 @@ def build_command(
         "--report_to",
         report_to,
     ]
+    if profile.get("gradient_checkpointing"):
+        command.append("--gradient_checkpointing")
     return command
 
 

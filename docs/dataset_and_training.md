@@ -15,6 +15,7 @@ Fallback dataset:
 
 - AFHQ v2 or a small product/object dataset if the team decides to avoid human-subject images.
 - Use only images with explicit permission or compatible public licenses.
+- FFHQ can be used for a non-commercial research proof run. Its dataset license is not appropriate for a production/commercial training source.
 
 ## Preparation
 
@@ -27,9 +28,19 @@ Fallback dataset:
 The advanced portrait path uses:
 
 ```powershell
+git clone https://github.com/NVlabs/ffhq-dataset.git data\portrait_finetune\raw\licensed\ffhq-dataset
+.\.venv\Scripts\python.exe scripts\download_ffhq_subset.py --count 2000 --shuffle --num-threads 8
 .\.venv\Scripts\python.exe scripts\prepare_portrait_dataset.py --profile sd15_local
 .\.venv\Scripts\python.exe scripts\prepare_portrait_dataset.py --profile sdxl_production
 ```
+
+For the local SD 1.5 proof run, launch training after Diffusers examples are cloned under `external/diffusers`:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\launch_lora_training.py --profile sd15_local --report-to tensorboard --run
+```
+
+The trained local adapter is expected at `models/lora/portrait_sd15_local/pytorch_lora_weights.safetensors`.
 
 ## Advanced model path
 
