@@ -7,6 +7,7 @@ FastAPI project for the advanced version of UTEC Project 2. The app works as a l
 - Provider switch with Preview, local GPU studio, and API studio modes.
 - Local GPU generation with Stable Diffusion img2img through `diffusers`.
 - API studio generation through OpenAI image edits when `OPENAI_API_KEY` or `VISGEN_OPENAI_API_KEY` is configured.
+- API studio provider routing for OpenAI, Modelslab, Hugging Face, or a custom Modal endpoint.
 - RTX 3060 Ti friendly defaults: 512x512, fp16, 28 steps, attention slicing.
 - Five studio presets from `config/generation.yaml`: natural lighting, cinematic tint, studio headshot, editorial polish, and soft luxury retouch.
 - Face lock: optional OpenCV face detection plus soft facial-region blending to reduce identity drift and malformed faces.
@@ -59,11 +60,21 @@ Use `Fine-tuned studio` after training or installing a portrait LoRA and optiona
 API studio reads these optional settings from `.env` or the deployment environment:
 
 ```text
+VISGEN_API_PROVIDER=openai
 OPENAI_API_KEY=
 VISGEN_OPENAI_API_KEY=
 VISGEN_OPENAI_IMAGE_MODEL=gpt-image-2
 VISGEN_OPENAI_IMAGE_SIZE=1024x1024
 VISGEN_OPENAI_IMAGE_QUALITY=medium
+
+# Modal-backed API studio
+VISGEN_API_PROVIDER=modal
+VISGEN_MODAL_ENDPOINT_URL=https://<workspace>--image-generation-service-v1-infer.modal.run
+VISGEN_MODAL_API_KEY=
+VISGEN_MODAL_TIMEOUT_SECONDS=240
+VISGEN_MODAL_NUM_INFERENCE_STEPS=4
+VISGEN_MODAL_GUIDANCE_SCALE=0.0
+VISGEN_MODAL_STRENGTH=0.45
 ```
 
 Fine-tuned studio reads these settings:
@@ -116,4 +127,4 @@ docker build -t ai-portrait-studio .
 docker run --rm -p 8000:8000 ai-portrait-studio
 ```
 
-API studio deployment needs an OpenAI API key. GPU studio deployment needs a CUDA host, the GPU PyTorch wheel, and local model weights. See `docs/deployment.md`.
+API studio deployment can use OpenAI or Modal endpoint configuration. GPU studio deployment needs a CUDA host, the GPU PyTorch wheel, and local model weights. See `docs/deployment.md`.

@@ -39,3 +39,12 @@ class DecisionResponse(BaseModel):
     accepted_ids: list[int]
     rejected_ids: list[int]
     record_path: str
+
+
+class RefinementResponse(BaseModel):
+    session_id: str
+    summary: str
+    mode: str
+    preserve_faces: bool
+    base_seed: int
+    variations: list[VariationInfo]

@@ -26,6 +26,7 @@ type Health = {
   device: string;
   cuda_available: boolean;
   gpu_name: string;
+  api_provider: string;
   api_key_configured: boolean;
   api_image_model: string;
   finetuned_ready: boolean;
@@ -132,6 +133,7 @@ export function StudioShell() {
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
 
   useEffect(() => {
     fetch('/api/health')
@@ -147,6 +149,7 @@ export function StudioShell() {
 
   const canSave = Boolean(sessionId) && selectedCount === variations.length && variations.length > 0;
   const activeTheme = resolvedTheme === 'light' ? 'light' : 'dark';
+  const isModalApiMode = mode === 'api' && health?.api_provider === 'modal';
 
   function handleFile(nextFile: File | null) {
     if (!nextFile) return;
@@ -165,14 +168,18 @@ export function StudioShell() {
     }
 
     const form = new FormData();
+    const effectivePreserveFaces = isModalApiMode ? false : preserveFaces;
     form.append('image', file);
     form.append('mode', mode);
     form.append('base_seed', String(seed));
-    form.append('preserve_faces', String(preserveFaces));
+    form.append('preserve_faces', String(effectivePreserveFaces));
 
     setIsGenerating(true);
     setStatus('Processing');
     setSummary('Rendering five professional portrait looks...');
+    setSessionId('');
+    setVariations([]);
+    setDecisions({});
 
     try {
       const response = await fetch('/api/generate', { method: 'POST', body: form });
@@ -206,6 +213,7 @@ export function StudioShell() {
     }
 
     setIsSaving(true);
+    setIsRefining(false);
     setStatus('Saving');
     const payload = {
       decisions: variations.map((item) => ({
@@ -222,11 +230,39 @@ export function StudioShell() {
         body: JSON.stringify(payload),
       });
       const data = await response.json();
-      setStatus(response.ok ? 'Saved' : 'Needs attention');
-      setSummary(response.ok ? data.summary : data.detail || 'Could not save the decisions.');
+      if (!response.ok) {
+        setStatus('Needs attention');
+        setSummary(data.detail || 'Could not save the decisions.');
+        return;
+      }
+
+      setStatus('Refining');
+      setIsRefining(true);
+      setSummary('Feedback saved. Creating a second pass from your kept looks...');
+
+      const refineResponse = await fetch(`/api/sessions/${sessionId}/refine`, {
+        method: 'POST',
+      });
+      const refinedData = await refineResponse.json();
+      if (!refineResponse.ok) {
+        setStatus('Saved');
+        setIsRefining(false);
+        setSummary(
+          `${data.summary} Refinement unavailable: ${refinedData.detail || 'could not generate second pass.'}`,
+        );
+        return;
+      }
+
+      setVariations(refinedData.variations);
+      setDecisions(emptyDecisions(refinedData.variations));
+      setSeed(refinedData.base_seed);
+      setStatus('Review');
+      setSummary(refinedData.summary);
+      setIsRefining(false);
     } catch {
       setStatus('Needs attention');
       setSummary('The decision service is not reachable.');
+      setIsRefining(false);
     } finally {
       setIsSaving(false);
     }
@@ -350,17 +386,24 @@ export function StudioShell() {
               </div>
 
               <div className="grid grid-cols-[1fr_112px] gap-3">
-                <button
-                  type="button"
-                  className={cn(
-                    'flex min-h-12 items-center gap-3 rounded-md border border-border bg-background/45 px-3 text-left text-sm font-semibold',
-                    preserveFaces && 'border-accent/50 bg-accent/10',
-                  )}
-                  onClick={() => setPreserveFaces((current) => !current)}
-                >
-                  <Lock className={cn('h-4 w-4 text-muted-foreground', preserveFaces && 'text-accent')} />
-                  Face lock
-                </button>
+                {isModalApiMode ? (
+                  <div className="flex min-h-12 items-center gap-3 rounded-md border border-border bg-background/45 px-3 text-left text-sm font-semibold text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    Face lock disabled (Modal)
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={cn(
+                      'flex min-h-12 items-center gap-3 rounded-md border border-border bg-background/45 px-3 text-left text-sm font-semibold',
+                      preserveFaces && 'border-accent/50 bg-accent/10',
+                    )}
+                    onClick={() => setPreserveFaces((current) => !current)}
+                  >
+                    <Lock className={cn('h-4 w-4 text-muted-foreground', preserveFaces && 'text-accent')} />
+                    Face lock
+                  </button>
+                )}
                 <label className="grid gap-1">
                   <span className="font-mono text-[10px] uppercase text-muted-foreground">Seed</span>
                   <input
@@ -388,7 +431,9 @@ export function StudioShell() {
                 <div className="flex justify-between gap-3">
                   <span>API</span>
                   <span className={cn('text-right', health?.api_key_configured ? 'text-accent' : 'text-muted-foreground')}>
-                    {health?.api_key_configured ? `${health.api_image_model} ready` : 'Key missing'}
+                    {health?.api_key_configured
+                      ? `${health.api_provider}: ${health.api_image_model}`
+                      : 'Not configured'}
                   </span>
                 </div>
                 <div className="flex justify-between gap-3">
@@ -423,16 +468,35 @@ export function StudioShell() {
                   <Badge variant="muted" className="mb-3 font-mono">
                     Studio Notes
                   </Badge>
+                  {isGenerating && (
+                    <Badge variant="accent" className="mb-3 ml-2 animate-pulse font-mono">
+                      Inference in progress
+                    </Badge>
+                  )}
+                  {isRefining && (
+                    <Badge variant="accent" className="mb-3 ml-2 animate-pulse font-mono">
+                      Refinement inference in progress
+                    </Badge>
+                  )}
                   <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{summary}</p>
                 </div>
                 <Button variant="outline" className="md:self-end" onClick={handleSave} disabled={!canSave || isSaving}>
                   <Save className="h-4 w-4" />
-                  {isSaving ? 'Saving' : 'Save selection'}
+                  {isRefining ? 'Refining' : isSaving ? 'Saving' : 'Save selection'}
                 </Button>
               </CardContent>
             </Card>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {variations.length === 0 && (
+                <Card className="sm:col-span-2 xl:col-span-5">
+                  <CardContent className="p-5 text-sm text-muted-foreground">
+                    {isGenerating
+                      ? 'Inference in progress. Waiting for the five generated looks...'
+                      : 'No generated looks yet. Upload a portrait and create a studio set.'}
+                  </CardContent>
+                </Card>
+              )}
               {variations.map((item) => {
                 const selected = decisions[item.id]?.decision || '';
                 return (

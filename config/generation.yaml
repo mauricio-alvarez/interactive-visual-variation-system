@@ -13,27 +13,27 @@ generation:
 
 variations:
   - label: "Natural lighting"
-    prompt: "bright window-lit professional lifestyle portrait, airy daylight, soft neutral background, realistic skin texture, same face, same identity, sharp eyes, 85mm lens, subtle natural retouching"
-    strength: 0.36
-    guidance_scale: 6.7
+    prompt: "bright sunlit professional lifestyle portrait, high-key daylight flooding from one side, crisp white bounce fill, airy cream background with visible depth, same face, same identity, razor-sharp eyes, 85mm lens, clean but noticeable retouching"
+    strength: 0.54
+    guidance_scale: 8.2
     seed_offset: 1
   - label: "Cinematic tint"
-    prompt: "low-key cinematic portrait, teal and warm amber color grade, soft rim light, darker textured background, same face, same identity, realistic skin texture, sharp eyes, film still mood"
-    strength: 0.42
-    guidance_scale: 7.0
+    prompt: "bold low-key cinematic portrait, deep teal shadows and strong amber highlights, hard rim light, moody textured dark background, same face, same identity, realistic skin texture, sharp eyes, dramatic film still contrast"
+    strength: 0.66
+    guidance_scale: 9.0
     seed_offset: 2
   - label: "Studio headshot"
-    prompt: "commercial studio headshot, clean softbox catchlights, seamless gray backdrop, crisp business portrait, same face, same identity, natural expression, sharp eyes, realistic skin"
-    strength: 0.34
-    guidance_scale: 7.1
+    prompt: "high-impact commercial studio headshot, bright dual softbox catchlights, pristine seamless gray backdrop, ultra-crisp business portrait framing, same face, same identity, confident natural expression, tack-sharp eyes, realistic skin"
+    strength: 0.52
+    guidance_scale: 8.6
     seed_offset: 3
   - label: "Editorial polish"
-    prompt: "fashion magazine editorial portrait, directional key light, refined contrast, sophisticated background depth, same face, same identity, realistic skin pores, sharp eyes, premium color grading"
-    strength: 0.44
-    guidance_scale: 7.2
+    prompt: "fashion magazine editorial portrait with strong directional key light, punchy refined contrast, deep sophisticated background separation, same face, same identity, realistic skin pores, sharp eyes, premium high-fashion color grading"
+    strength: 0.68
+    guidance_scale: 9.2
     seed_offset: 4
   - label: "Soft luxury retouch"
-    prompt: "high-end beauty portrait, soft clamshell lighting, luminous but natural skin, elegant warm neutral background, same face, same identity, no plastic skin, premium campaign style"
-    strength: 0.33
-    guidance_scale: 6.8
+    prompt: "high-end beauty campaign portrait, soft clamshell lighting with glowing highlights, luminous polished skin while keeping natural texture, elegant warm champagne background, same face, same identity, no plastic skin, luxury campaign finish"
+    strength: 0.58
+    guidance_scale: 8.4
     seed_offset: 5

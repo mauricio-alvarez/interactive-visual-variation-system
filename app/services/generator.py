@@ -50,14 +50,295 @@ class ImageVariationGenerator:
         base_seed: int = 4200,
         mode: str = "diffusion",
         preserve_faces: bool = True,
+        styles: list[VariationStyle] | None = None,
     ) -> list[dict[str, Any]]:
         if mode == "demo":
-            return self._generate_demo_variations(input_path, output_dir, base_seed, preserve_faces)
+            return self._generate_demo_variations(input_path, output_dir, base_seed, preserve_faces, styles)
         if mode == "api":
-            return self._generate_openai_variations(input_path, output_dir, base_seed, preserve_faces)
+            return self._generate_api_variations(input_path, output_dir, base_seed, preserve_faces, styles)
         if mode == "finetuned":
-            return self._generate_finetuned_variations(input_path, output_dir, base_seed, preserve_faces)
-        return self._generate_diffusion_variations(input_path, output_dir, base_seed, preserve_faces)
+            return self._generate_finetuned_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+        return self._generate_diffusion_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+
+    def api_provider(self) -> str:
+        provider = (settings.api_provider or "openai").strip().lower()
+        return provider if provider in {"openai", "modelslab", "huggingface", "modal"} else "openai"
+
+    def api_key_configured(self) -> bool:
+        import os
+
+        if self.api_provider() == "modelslab":
+            return bool(settings.modelslab_api_key or os.getenv("MODELSLAB_API_KEY"))
+        if self.api_provider() == "huggingface":
+            return bool(settings.huggingface_api_key or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN"))
+        if self.api_provider() == "modal":
+            return bool(
+                (settings.modal_endpoint_url or "").strip()
+                or os.getenv("VISGEN_MODAL_ENDPOINT_URL", "").strip()
+                or os.getenv("MODAL_ENDPOINT_URL", "").strip()
+            )
+        return bool(settings.openai_api_key or os.getenv("OPENAI_API_KEY"))
+
+    def _generate_api_variations(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        base_seed: int,
+        preserve_faces: bool,
+        styles: list[VariationStyle] | None,
+    ) -> list[dict[str, Any]]:
+        if self.api_provider() == "modelslab":
+            return self._generate_modelslab_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+        if self.api_provider() == "huggingface":
+            return self._generate_huggingface_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+        if self.api_provider() == "modal":
+            return self._generate_modal_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+        return self._generate_openai_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+
+    def _generate_modal_variations(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        base_seed: int,
+        preserve_faces: bool,
+        styles: list[VariationStyle] | None,
+    ) -> list[dict[str, Any]]:
+        import base64
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import os
+
+        import httpx
+
+        endpoint = (
+            (settings.modal_endpoint_url or "").strip()
+            or os.getenv("VISGEN_MODAL_ENDPOINT_URL", "").strip()
+            or os.getenv("MODAL_ENDPOINT_URL", "").strip()
+        )
+        if not endpoint:
+            raise RuntimeError("VISGEN_MODAL_ENDPOINT_URL or MODAL_ENDPOINT_URL is required for API studio mode.")
+
+        modal_api_key = (
+            (settings.modal_api_key or "").strip()
+            or os.getenv("VISGEN_MODAL_API_KEY", "").strip()
+            or os.getenv("MODAL_API_KEY", "").strip()
+        )
+
+        prepared = self._prepare_image(input_path)
+        api_input = output_dir / "api_input.png"
+        prepared.save(api_input)
+        input_b64 = base64.b64encode(api_input.read_bytes()).decode("utf-8")
+        width, height = self._parse_image_size(settings.openai_image_size)
+        active_styles = styles or self.styles
+
+        headers = {"Content-Type": "application/json"}
+        if modal_api_key:
+            headers["Authorization"] = f"Bearer {modal_api_key}"
+
+        timeout = max(30, int(settings.modal_timeout_seconds))
+        def send_modal_request(idx: int, style: VariationStyle, seed: int) -> tuple[int, VariationStyle, int, str]:
+            payload = {
+                "prompt": self._api_edit_prompt(style, idx),
+                "input_image_base64": input_b64,
+                "negative_prompt": (
+                    "blurry, low quality, distorted face, changed identity, malformed eyes, "
+                    "waxy skin, artifacts"
+                ),
+                "width": width,
+                "height": height,
+                "strength": max(0.05, min(0.95, float(settings.modal_strength))),
+                "num_inference_steps": max(1, min(8, int(settings.modal_num_inference_steps))),
+                "guidance_scale": max(0.0, min(10.0, float(settings.modal_guidance_scale))),
+                "seed": int(seed),
+            }
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(endpoint, headers=headers, json=payload)
+                if response.status_code >= 400:
+                    raise RuntimeError(f"Modal generation failed for variation {idx}: {response.status_code} {response.text}")
+
+                payload_json = response.json()
+                image_b64 = str(payload_json.get("image_base64", "")).strip()
+                if not image_b64:
+                    raise RuntimeError(f"Modal endpoint returned no image_base64 for variation {idx}: {payload_json}")
+                return idx, style, seed, image_b64
+
+        max_workers = min(5, max(1, len(active_styles)))
+        responses: dict[int, tuple[VariationStyle, int, str]] = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {
+                executor.submit(send_modal_request, idx, style, base_seed + style.seed_offset): idx
+                for idx, style in enumerate(active_styles, start=1)
+            }
+            for future in as_completed(future_map):
+                idx, style, seed, image_b64 = future.result()
+                responses[idx] = (style, seed, image_b64)
+
+        results: list[dict[str, Any]] = []
+        for idx in range(1, len(active_styles) + 1):
+            style, seed, image_b64 = responses[idx]
+            out_path = output_dir / f"variation_{idx}.png"
+            out_path.write_bytes(base64.b64decode(image_b64))
+
+            generated = Image.open(out_path).convert("RGB")
+            face_count = 0
+            if preserve_faces:
+                generated, face_count = self._preserve_faces(prepared, generated)
+            generated = self._studio_finish(generated)
+            generated.save(out_path)
+
+            results.append(self._metadata(idx, out_path, seed, style, preserve_faces, face_count, "modal-api"))
+
+        return results
+
+    def _generate_huggingface_variations(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        base_seed: int,
+        preserve_faces: bool,
+        styles: list[VariationStyle] | None,
+    ) -> list[dict[str, Any]]:
+        import os
+
+        import httpx
+
+        api_key = (
+            settings.huggingface_api_key
+            or os.getenv("HF_TOKEN", "")
+            or os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
+        )
+        if not api_key:
+            raise RuntimeError(
+                "HF_TOKEN, HUGGINGFACEHUB_API_TOKEN, or VISGEN_HUGGINGFACE_API_KEY is required for API studio mode."
+            )
+
+        prepared = self._prepare_image(input_path)
+        active_styles = styles or self.styles
+        endpoint = f"{settings.huggingface_base_url.rstrip('/')}/{settings.huggingface_model_id}"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "image/png",
+            "Content-Type": "application/json",
+        }
+
+        results: list[dict[str, Any]] = []
+        with httpx.Client(timeout=300) as client:
+            for idx, style in enumerate(active_styles, start=1):
+                seed = base_seed + style.seed_offset
+                payload = {
+                    "inputs": self._api_text_to_image_prompt(style, idx),
+                    "parameters": {
+                        "negative_prompt": (
+                            "blurry, low quality, distorted face, changed identity, malformed eyes, "
+                            "waxy skin, artifacts"
+                        ),
+                        "guidance_scale": max(4.0, float(style.guidance_scale)),
+                        "num_inference_steps": 30,
+                        "width": settings.image_size,
+                        "height": settings.image_size,
+                        "seed": int(seed),
+                    },
+                    "options": {"wait_for_model": True, "use_cache": False},
+                }
+                response = client.post(endpoint, headers=headers, json=payload)
+                if response.status_code >= 400:
+                    raise RuntimeError(f"Hugging Face generation failed: {response.status_code} {response.text}")
+
+                content_type = (response.headers.get("content-type") or "").lower()
+                if "image/" in content_type:
+                    image_bytes = response.content
+                else:
+                    payload_json = response.json()
+                    error_text = payload_json.get("error") if isinstance(payload_json, dict) else None
+                    raise RuntimeError(
+                        f"Hugging Face did not return an image. Response: {error_text or payload_json}"
+                    )
+
+                out_path = output_dir / f"variation_{idx}.png"
+                out_path.write_bytes(image_bytes)
+
+                generated = Image.open(out_path).convert("RGB")
+                face_count = 0
+                if preserve_faces:
+                    generated, face_count = self._preserve_faces(prepared, generated)
+                generated = self._studio_finish(generated)
+                generated.save(out_path)
+
+                results.append(
+                    self._metadata(idx, out_path, seed, style, preserve_faces, face_count, "huggingface-api")
+                )
+
+        return results
+
+    def refined_styles_from_feedback(
+        self,
+        decisions: list[dict[str, Any]],
+        previous_variations: list[dict[str, Any]],
+        preference_profile: dict[str, Any] | None = None,
+    ) -> list[VariationStyle]:
+        accepted_ids = {
+            int(item.get("variation_id", 0))
+            for item in decisions
+            if item.get("decision") == "accepted"
+        }
+        if not accepted_ids:
+            raise RuntimeError("Refinement requires at least one kept look.")
+
+        accepted_variations = [item for item in previous_variations if int(item.get("id", 0)) in accepted_ids]
+        if not accepted_variations:
+            raise RuntimeError("Refinement could not match kept looks to the previous variation set.")
+
+        profile = preference_profile or {}
+        prompt_directive = str(profile.get("prompt_directive", "")).strip()
+        negative_directive = str(profile.get("negative_directive", "")).strip()
+        strength_shift = float(profile.get("strength_shift", 0.0))
+        guidance_shift = float(profile.get("guidance_shift", 0.0))
+
+        refined_styles: list[VariationStyle] = []
+        for idx in range(settings.num_variations):
+            base = accepted_variations[idx % len(accepted_variations)]
+            source_label = str(base.get("label", "Studio look")).strip() or "Studio look"
+            source_prompt = self._strip_refinement_boilerplate(str(base.get("prompt", "")).strip())
+            source_strength = float(base.get("strength", 0.4))
+            source_guidance = float(base.get("guidance_scale", 7.0))
+            step = idx - (settings.num_variations // 2)
+            prompt_parts = [
+                source_prompt,
+                "Refine from approved feedback while preserving identity and realistic skin.",
+            ]
+            if prompt_directive:
+                prompt_parts.append(self._truncate_prompt_directive(prompt_directive))
+            if negative_directive:
+                prompt_parts.append(self._truncate_prompt_directive(negative_directive))
+
+            refined_styles.append(
+                VariationStyle(
+                    label=f"{source_label} refined {idx + 1}",
+                    prompt=" ".join(prompt_parts),
+                    strength=max(0.2, min(0.62, source_strength + strength_shift + (0.02 * step))),
+                    guidance_scale=max(5.8, min(9.2, source_guidance + guidance_shift + (0.35 * step))),
+                    seed_offset=101 + (idx * 17),
+                )
+            )
+        return refined_styles
+
+    def _strip_refinement_boilerplate(self, prompt: str) -> str:
+        markers = [
+            "Refine this look from approved user feedback.",
+            "Refine from approved feedback while preserving identity and realistic skin.",
+            "Keep the same subject identity and push professional portrait quality, better facial geometry, cleaner skin texture, and lighting consistency.",
+            "Emphasize",
+            "Avoid",
+        ]
+        for marker in markers:
+            if marker in prompt:
+                prompt = prompt.split(marker, 1)[0].strip()
+        return prompt.rstrip(" .")
+
+    def _truncate_prompt_directive(self, text: str, max_words: int = 8) -> str:
+        words = text.strip().split()
+        if len(words) <= max_words:
+            return text.strip()
+        return " ".join(words[:max_words]).rstrip(";,.") + "."
 
     def finetuned_configured(self) -> bool:
         return bool(settings.finetuned_allow_base or settings.finetuned_lora_path or settings.ip_adapter_enabled)
@@ -159,6 +440,7 @@ class ImageVariationGenerator:
         output_dir: Path,
         base_seed: int,
         preserve_faces: bool,
+        styles: list[VariationStyle] | None,
     ) -> list[dict[str, Any]]:
         import torch
 
@@ -171,7 +453,8 @@ class ImageVariationGenerator:
         )
 
         results: list[dict[str, Any]] = []
-        for idx, style in enumerate(self.styles, start=1):
+        active_styles = styles or self.styles
+        for idx, style in enumerate(active_styles, start=1):
             seed = base_seed + style.seed_offset
             generator = torch.Generator(device=settings.device).manual_seed(seed)
             result = pipe(
@@ -200,6 +483,7 @@ class ImageVariationGenerator:
         output_dir: Path,
         base_seed: int,
         preserve_faces: bool,
+        styles: list[VariationStyle] | None,
     ) -> list[dict[str, Any]]:
         import base64
         import os
@@ -217,8 +501,9 @@ class ImageVariationGenerator:
 
         headers = {"Authorization": f"Bearer {api_key}"}
         results: list[dict[str, Any]] = []
+        active_styles = styles or self.styles
         with httpx.Client(timeout=180) as client:
-            for idx, style in enumerate(self.styles, start=1):
+            for idx, style in enumerate(active_styles, start=1):
                 seed = base_seed + style.seed_offset
                 prompt = self._api_edit_prompt(style, idx)
                 files = [("image[]", ("portrait.png", image_bytes, "image/png"))]
@@ -250,12 +535,181 @@ class ImageVariationGenerator:
 
         return results
 
+    def _generate_modelslab_variations(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        base_seed: int,
+        preserve_faces: bool,
+        styles: list[VariationStyle] | None,
+    ) -> list[dict[str, Any]]:
+        import base64
+        import os
+
+        import httpx
+
+        api_key = settings.modelslab_api_key or os.getenv("MODELSLAB_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("MODELSLAB_API_KEY or VISGEN_MODELSLAB_API_KEY is required for API studio mode.")
+
+        model_id = (settings.modelslab_model_id or "").strip()
+        if model_id == "gemini-3.1-t2i":
+            return self._generate_modelslab_text_to_image_variations(
+                input_path,
+                output_dir,
+                base_seed,
+                preserve_faces,
+                styles,
+                api_key,
+            )
+
+        prepared = self._prepare_image(input_path)
+        api_input = output_dir / "api_input.png"
+        prepared.save(api_input)
+        image_b64 = base64.b64encode(api_input.read_bytes()).decode("utf-8")
+        active_styles = styles or self.styles
+        width, height = self._parse_image_size(settings.openai_image_size)
+        negative_prompt = (
+            "blurry, low quality, distorted face, changed identity, waxy skin, malformed eyes, "
+            "deformed teeth, extra facial features"
+        )
+
+        results: list[dict[str, Any]] = []
+        with httpx.Client(timeout=240) as client:
+            for idx, style in enumerate(active_styles, start=1):
+                seed = base_seed + style.seed_offset
+                payload = {
+                    "key": api_key,
+                    "prompt": self._api_edit_prompt(style, idx),
+                    "negative_prompt": negative_prompt,
+                    "init_image": image_b64,
+                    "width": width,
+                    "height": height,
+                    "samples": "1",
+                    "num_inference_steps": "30",
+                    "safety_checker": "no",
+                    "enhance_prompt": "yes",
+                    "guidance_scale": max(4.0, float(style.guidance_scale)),
+                    "strength": max(0.2, min(0.75, float(style.strength))),
+                    "seed": str(seed),
+                    "scheduler": settings.modelslab_scheduler,
+                    "model_id": model_id,
+                }
+                response = client.post(f"{settings.modelslab_base_url.rstrip('/')}/img2img", json=payload)
+                if response.status_code >= 400:
+                    raise RuntimeError(f"Modelslab img2img failed: {response.status_code} {response.text}")
+
+                payload_json = response.json()
+                outputs = payload_json.get("output") or payload_json.get("images") or []
+                if not outputs:
+                    raise RuntimeError(f"Modelslab img2img returned no output: {payload_json}")
+
+                image_ref = outputs[0]
+                out_path = output_dir / f"variation_{idx}.png"
+                if isinstance(image_ref, str) and image_ref.startswith("http"):
+                    img_response = client.get(image_ref)
+                    if img_response.status_code >= 400:
+                        raise RuntimeError(
+                            f"Modelslab output download failed: {img_response.status_code} {img_response.text}"
+                        )
+                    out_path.write_bytes(img_response.content)
+                else:
+                    image_data = base64.b64decode(str(image_ref))
+                    out_path.write_bytes(image_data)
+
+                face_count = len(self._detect_faces(prepared)) if preserve_faces else 0
+                results.append(self._metadata(idx, out_path, seed, style, preserve_faces, face_count, "modelslab-api"))
+        return results
+
+    def _generate_modelslab_text_to_image_variations(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        base_seed: int,
+        preserve_faces: bool,
+        styles: list[VariationStyle] | None,
+        api_key: str,
+    ) -> list[dict[str, Any]]:
+        import base64
+
+        import httpx
+
+        prepared = self._prepare_image(input_path)
+        active_styles = styles or self.styles
+        results: list[dict[str, Any]] = []
+
+        with httpx.Client(timeout=240) as client:
+            for idx, style in enumerate(active_styles, start=1):
+                seed = base_seed + style.seed_offset
+                payload = {
+                    "key": api_key,
+                    "model_id": "gemini-3.1-t2i",
+                    "prompt": self._api_text_to_image_prompt(style, idx),
+                    "aspect_ratio": settings.modelslab_aspect_ratio,
+                    "resolution": settings.modelslab_resolution,
+                }
+                response = client.post(settings.modelslab_t2i_url, json=payload)
+                if response.status_code >= 400:
+                    raise RuntimeError(f"Modelslab text-to-image failed: {response.status_code} {response.text}")
+
+                payload_json = response.json()
+                outputs = payload_json.get("output") or payload_json.get("images") or []
+                if not outputs:
+                    raise RuntimeError(f"Modelslab text-to-image returned no output: {payload_json}")
+
+                image_ref = outputs[0]
+                out_path = output_dir / f"variation_{idx}.png"
+                if isinstance(image_ref, str) and image_ref.startswith("http"):
+                    img_response = client.get(image_ref)
+                    if img_response.status_code >= 400:
+                        raise RuntimeError(
+                            f"Modelslab output download failed: {img_response.status_code} {img_response.text}"
+                        )
+                    out_path.write_bytes(img_response.content)
+                else:
+                    image_data = base64.b64decode(str(image_ref))
+                    out_path.write_bytes(image_data)
+
+                generated = Image.open(out_path).convert("RGB")
+                face_count = 0
+                if preserve_faces:
+                    generated, face_count = self._preserve_faces(prepared, generated)
+                generated = self._studio_finish(generated)
+                generated.save(out_path)
+
+                results.append(
+                    self._metadata(
+                        idx,
+                        out_path,
+                        seed,
+                        style,
+                        preserve_faces,
+                        face_count,
+                        "modelslab-api-t2i",
+                    )
+                )
+
+        return results
+
+    def _parse_image_size(self, raw: str) -> tuple[int, int]:
+        text = (raw or "512x512").lower().strip()
+        if "x" not in text:
+            return 512, 512
+        left, right = text.split("x", 1)
+        try:
+            width = int(left)
+            height = int(right)
+            return width, height
+        except ValueError:
+            return 512, 512
+
     def _generate_finetuned_variations(
         self,
         input_path: Path,
         output_dir: Path,
         base_seed: int,
         preserve_faces: bool,
+        styles: list[VariationStyle] | None,
     ) -> list[dict[str, Any]]:
         import torch
 
@@ -268,7 +722,8 @@ class ImageVariationGenerator:
         )
 
         results: list[dict[str, Any]] = []
-        for idx, style in enumerate(self.styles, start=1):
+        active_styles = styles or self.styles
+        for idx, style in enumerate(active_styles, start=1):
             seed = base_seed + style.seed_offset
             generator = torch.Generator(device=settings.device).manual_seed(seed)
             call_kwargs: dict[str, Any] = {
@@ -303,8 +758,10 @@ class ImageVariationGenerator:
         output_dir: Path,
         base_seed: int,
         preserve_faces: bool,
+        styles: list[VariationStyle] | None,
     ) -> list[dict[str, Any]]:
         image = self._prepare_image(input_path)
+        active_styles = styles or self.styles
         transforms = [
             lambda im: self._natural_lighting(im),
             lambda im: self._cinematic_tint(im),
@@ -313,7 +770,7 @@ class ImageVariationGenerator:
             lambda im: self._soft_luxury_retouch(im),
         ]
         results: list[dict[str, Any]] = []
-        for idx, (style, transform) in enumerate(zip(self.styles, transforms), start=1):
+        for idx, (style, transform) in enumerate(zip(active_styles, transforms), start=1):
             out_path = output_dir / f"variation_{idx}.png"
             generated = transform(image.copy())
             face_count = 0
@@ -342,6 +799,13 @@ class ImageVariationGenerator:
             "identity, facial structure, eye shape, nose, mouth, age, and natural skin texture. "
             "Do not beautify by changing identity. Avoid warped eyes, altered teeth, plastic skin, "
             "extra facial features, or artificial-looking retouching."
+        )
+
+    def _api_text_to_image_prompt(self, style: VariationStyle, idx: int) -> str:
+        return (
+            f"Professional portrait photo, studio look {idx}: {style.label}. {style.prompt}. "
+            "Preserve realistic face proportions, detailed eyes, natural skin texture, clean lighting, "
+            "and production-ready portrait quality. Avoid blur, waxy skin, distorted anatomy, artifacts, and text."
         )
 
     def _finetuned_prompt(self, style: VariationStyle, idx: int) -> str:
