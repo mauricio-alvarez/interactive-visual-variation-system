@@ -32,10 +32,11 @@ profiles:
     rank: 8
     train_batch_size: 1
     gradient_accumulation_steps: 4
+    gradient_checkpointing: true
     learning_rate: 0.0001
     max_train_steps: 4000
     checkpointing_steps: 500
-    validation_steps: 250
+    validation_epochs: 1
     seed: 1337
 
   sdxl_production:
@@ -48,10 +49,11 @@ profiles:
     rank: 16
     train_batch_size: 1
     gradient_accumulation_steps: 8
+    gradient_checkpointing: true
     learning_rate: 0.000075
     max_train_steps: 9000
     checkpointing_steps: 500
-    validation_steps: 250
+    validation_epochs: 1
     seed: 1337
 
 identity_adapter:

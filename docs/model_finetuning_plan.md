@@ -194,7 +194,7 @@ Suggested settings:
 - Mixed precision: fp16.
 - Training steps: 3,000 to 6,000.
 - Learning rate: start at `1e-4`, reduce if overfitting appears.
-- Validation every 250 steps.
+- Validation each epoch for the current Diffusers text-to-image LoRA script.
 
 Expected result:
 

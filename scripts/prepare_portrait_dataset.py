@@ -15,6 +15,7 @@ from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+FFHQ_PATH_MARKERS = {"images1024x1024", "in-the-wild-images", "realign1024x1024"}
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -44,6 +45,8 @@ def infer_identity(path: Path, raw_dirs: list[Path]) -> str:
             rel = path.relative_to(raw_dir)
         except ValueError:
             continue
+        if FFHQ_PATH_MARKERS.intersection(rel.parts):
+            return clean_id(f"ffhq_{path.stem}")
         if len(rel.parts) > 1:
             return clean_id(rel.parts[0])
     return clean_id(path.stem)

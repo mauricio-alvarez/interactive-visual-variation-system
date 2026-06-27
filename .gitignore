@@ -19,3 +19,4 @@ frontend/vite.config.d.ts
 *.jpeg
 *.png
 .venv-modal/
+external/
