@@ -57,7 +57,7 @@ const modes: Array<{ value: Mode; label: string; detail: string; icon: typeof Sp
 const sampleVariations: Variation[] = [
   {
     id: 1,
-    label: 'Natural lighting',
+    label: 'Beach sun hat',
     provider: 'preview',
     image_url: '/examples/session_001/variation_1.png',
     seed: 4201,
@@ -67,7 +67,7 @@ const sampleVariations: Variation[] = [
   },
   {
     id: 2,
-    label: 'Cinematic tint',
+    label: 'Neon noir street',
     provider: 'preview',
     image_url: '/examples/session_001/variation_2.png',
     seed: 4202,
@@ -77,7 +77,7 @@ const sampleVariations: Variation[] = [
   },
   {
     id: 3,
-    label: 'Studio headshot',
+    label: 'Corporate studio',
     provider: 'preview',
     image_url: '/examples/session_001/variation_3.png',
     seed: 4203,
@@ -87,7 +87,7 @@ const sampleVariations: Variation[] = [
   },
   {
     id: 4,
-    label: 'Editorial polish',
+    label: 'Red editorial',
     provider: 'preview',
     image_url: '/examples/session_001/variation_4.png',
     seed: 4204,
@@ -97,7 +97,7 @@ const sampleVariations: Variation[] = [
   },
   {
     id: 5,
-    label: 'Soft luxury retouch',
+    label: 'Hotel luxury beauty',
     provider: 'preview',
     image_url: '/examples/session_001/variation_5.png',
     seed: 4205,
@@ -478,7 +478,7 @@ export function StudioShell() {
                       Refinement inference in progress
                     </Badge>
                   )}
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{summary}</p>
+                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground"> {summary}</p>
                 </div>
                 <Button variant="outline" className="md:self-end" onClick={handleSave} disabled={!canSave || isSaving}>
                   <Save className="h-4 w-4" />

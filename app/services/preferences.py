@@ -50,8 +50,7 @@ class PreferenceProfiler:
                 rejected_guidance.append(float(variation.get("guidance_scale", 7.0)))
                 self._accumulate(disliked_scores, source_text, weight=1.0)
 
-        liked_traits = self._top_traits(liked_scores)
-        avoided_traits = self._top_traits(disliked_scores)
+        liked_traits, avoided_traits = self._select_disjoint_traits(liked_scores, disliked_scores)
 
         strength_shift = self._clamp(
             self._mean(accepted_strengths) - self._mean(rejected_strengths),
@@ -86,6 +85,35 @@ class PreferenceProfiler:
     def _top_traits(self, scores: dict[str, float], limit: int = 3) -> list[str]:
         ranked = sorted(scores.items(), key=lambda pair: pair[1], reverse=True)
         return [trait for trait, score in ranked if score > 0][:limit]
+
+    def _select_disjoint_traits(
+        self,
+        liked_scores: dict[str, float],
+        disliked_scores: dict[str, float],
+        limit: int = 3,
+    ) -> tuple[list[str], list[str]]:
+        # Use a net score so a trait cannot simultaneously rank as strongly liked and disliked.
+        net_scores = {
+            trait: liked_scores.get(trait, 0.0) - disliked_scores.get(trait, 0.0)
+            for trait in self._TRAIT_KEYWORDS
+        }
+
+        liked_ranked = sorted(net_scores.items(), key=lambda pair: pair[1], reverse=True)
+        disliked_ranked = sorted(net_scores.items(), key=lambda pair: pair[1])
+
+        liked_traits = [trait for trait, score in liked_ranked if score > 0][:limit]
+        avoided_traits = [trait for trait, score in disliked_ranked if score < 0][:limit]
+
+        # Fallback when only one side has positive signal in a round.
+        if not liked_traits:
+            liked_traits = self._top_traits(liked_scores, limit=limit)
+        if not avoided_traits:
+            avoided_traits = self._top_traits(disliked_scores, limit=limit)
+
+        # Final guardrail: ensure no overlap in output lists.
+        liked_set = set(liked_traits)
+        avoided_traits = [trait for trait in avoided_traits if trait not in liked_set]
+        return liked_traits, avoided_traits
 
     def _build_directive(self, traits: list[str], prefix: str) -> str:
         if not traits:

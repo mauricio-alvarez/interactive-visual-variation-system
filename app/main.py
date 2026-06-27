@@ -67,6 +67,7 @@ def health():
         cuda_available = False
         gpu_name = ""
     provider = generator.api_provider()
+    llm_provider = (settings.explainer_provider or "rule").strip().lower() or "rule"
     if provider == "modelslab":
         api_model = settings.modelslab_model_id
     elif provider == "huggingface":
@@ -81,6 +82,13 @@ def health():
     else:
         api_model = settings.openai_image_model
 
+    if llm_provider == "groq":
+        llm_model = settings.groq_model
+        llm_key_configured = bool(settings.groq_api_key or os.getenv("GROQ_API_KEY"))
+    else:
+        llm_model = "rules-v1"
+        llm_key_configured = True
+
     return {
         "status": "ok",
         "model_id": settings.model_id,
@@ -90,6 +98,9 @@ def health():
         "api_provider": provider,
         "api_key_configured": _api_key_configured(),
         "api_image_model": api_model,
+        "llm_provider": llm_provider,
+        "llm_model": llm_model,
+        "llm_key_configured": llm_key_configured,
         "finetuned_ready": _finetuned_configured(),
         "finetuned_model_id": settings.finetuned_model_id,
         "identity_adapter_enabled": settings.ip_adapter_enabled,
@@ -200,7 +211,10 @@ def save_decisions(session_id: str, request: DecisionRequest):
     record = store.read_record(session_id)
     decisions = [item.model_dump() for item in request.decisions]
     record["decisions"] = decisions
-    record["summary"] = explainer.explain(record)
+    explanation = explainer.explain_with_metadata(record)
+    record["summary"] = explanation["summary"]
+    record["explanation_provider"] = explanation["provider"]
+    record["explanation_model"] = explanation["model"]
     record["decided_at"] = datetime.now(timezone.utc).isoformat()
 
     record.setdefault("decision_history", []).append(
@@ -215,6 +229,8 @@ def save_decisions(session_id: str, request: DecisionRequest):
             "timestamp": record["decided_at"],
             "kind": "decision",
             "summary": record["summary"],
+            "provider": record.get("explanation_provider", "rule"),
+            "model": record.get("explanation_model", "rules-v1"),
         }
     )
 
@@ -224,6 +240,8 @@ def save_decisions(session_id: str, request: DecisionRequest):
     return {
         "session_id": session_id,
         "summary": record["summary"],
+        "explanation_provider": record.get("explanation_provider", "rule"),
+        "explanation_model": record.get("explanation_model", "rules-v1"),
         "accepted_ids": accepted_ids,
         "rejected_ids": rejected_ids,
         "record_path": str(record_path),
@@ -249,7 +267,7 @@ def refine_session(session_id: str):
 
     try:
         preference_profile = preference_profiler.build(decisions, record.get("variations", []))
-        refined_styles = generator.refined_styles_from_feedback(
+        refined_styles = generator.refined_styles_from_feedback_ai(
             decisions,
             record.get("variations", []),
             preference_profile=preference_profile,
@@ -270,22 +288,22 @@ def refine_session(session_id: str):
         image_path = Path(item["image_path"])
         response_variations.append({**item, "image_url": public_output_url(image_path)})
 
-    accepted_labels = [
-        str(item.get("label", "")).strip()
-        for item in record.get("variations", [])
-        if int(item.get("id", 0)) in accepted_ids
-    ]
-    label_text = ", ".join([label for label in accepted_labels if label]) or "kept look(s)"
-    liked_text = ", ".join(preference_profile.get("liked_traits", [])) or "no dominant likes detected"
-    avoided_text = ", ".join(preference_profile.get("avoided_traits", [])) or "no dominant dislikes detected"
-    refinement_summary = (
-        f"Second pass generated from approved look(s): {label_text}. "
-        f"Preference signal: likes {liked_text}; dislikes {avoided_text}. "
-        "Review this refined set and keep/pass again for another iteration."
-    )
+    try:
+        refinement_explanation = explainer.explain_refinement_with_metadata(
+            record,
+            accepted_ids,
+            preference_profile,
+            round_index,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    refinement_summary = refinement_explanation["summary"]
 
     record["variations"] = response_variations
     record["summary"] = refinement_summary
+    record["explanation_provider"] = refinement_explanation["provider"]
+    record["explanation_model"] = refinement_explanation["model"]
     record["refinement_round"] = round_index
     record["preference_profile"] = preference_profile
     record["refined_at"] = datetime.now(timezone.utc).isoformat()
@@ -317,6 +335,8 @@ def refine_session(session_id: str):
             "timestamp": record["refined_at"],
             "kind": "refinement",
             "summary": refinement_summary,
+            "provider": record.get("explanation_provider", "unknown"),
+            "model": record.get("explanation_model", "unknown"),
         }
     )
     store.write_record(settings.output_dir / session_id, record)

@@ -36,6 +36,8 @@ class DecisionRequest(BaseModel):
 class DecisionResponse(BaseModel):
     session_id: str
     summary: str
+    explanation_provider: str = "rule"
+    explanation_model: str = "rules-v1"
     accepted_ids: list[int]
     rejected_ids: list[int]
     record_path: str

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
+import httpx
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 from app.core.settings import PROJECT_ROOT, settings
@@ -25,9 +28,14 @@ class ImageVariationGenerator:
     def __init__(self):
         self._pipeline = None
         self._finetuned_pipeline = None
+        self._styles_mtime_ns: int | None = None
         self.styles = self._load_styles()
 
     def _load_styles(self) -> list[VariationStyle]:
+        try:
+            self._styles_mtime_ns = settings.config_path.stat().st_mtime_ns
+        except OSError:
+            self._styles_mtime_ns = None
         raw = yaml.safe_load(settings.config_path.read_text(encoding="utf-8"))
         styles = [
             VariationStyle(
@@ -43,6 +51,15 @@ class ImageVariationGenerator:
             raise ValueError(f"Expected {settings.num_variations} styles, found {len(styles)}.")
         return styles
 
+    def _refresh_styles_if_needed(self) -> None:
+        try:
+            current_mtime_ns = settings.config_path.stat().st_mtime_ns
+        except OSError:
+            current_mtime_ns = None
+
+        if self._styles_mtime_ns != current_mtime_ns:
+            self.styles = self._load_styles()
+
     def generate(
         self,
         input_path: Path,
@@ -52,6 +69,7 @@ class ImageVariationGenerator:
         preserve_faces: bool = True,
         styles: list[VariationStyle] | None = None,
     ) -> list[dict[str, Any]]:
+        self._refresh_styles_if_needed()
         if mode == "demo":
             return self._generate_demo_variations(input_path, output_dir, base_seed, preserve_faces, styles)
         if mode == "api":
@@ -87,13 +105,135 @@ class ImageVariationGenerator:
         preserve_faces: bool,
         styles: list[VariationStyle] | None,
     ) -> list[dict[str, Any]]:
+        if styles is not None:
+            active_styles = styles
+        else:
+            try:
+                active_styles = self.dynamic_api_styles_from_llm(base_seed)
+            except Exception:
+                # Keep API generation usable even if live prompt planning is unavailable.
+                active_styles = self.styles
         if self.api_provider() == "modelslab":
-            return self._generate_modelslab_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+            return self._generate_modelslab_variations(input_path, output_dir, base_seed, preserve_faces, active_styles)
         if self.api_provider() == "huggingface":
-            return self._generate_huggingface_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+            return self._generate_huggingface_variations(input_path, output_dir, base_seed, preserve_faces, active_styles)
         if self.api_provider() == "modal":
-            return self._generate_modal_variations(input_path, output_dir, base_seed, preserve_faces, styles)
-        return self._generate_openai_variations(input_path, output_dir, base_seed, preserve_faces, styles)
+            return self._generate_modal_variations(input_path, output_dir, base_seed, preserve_faces, active_styles)
+        return self._generate_openai_variations(input_path, output_dir, base_seed, preserve_faces, active_styles)
+
+    def dynamic_api_styles_from_llm(self, base_seed: int) -> list[VariationStyle]:
+        api_key = (settings.groq_api_key or os.getenv("GROQ_API_KEY", "")).strip()
+        if not api_key:
+            raise RuntimeError(
+                "API prompt planning requires GROQ_API_KEY or VISGEN_GROQ_API_KEY. "
+                "Configure it to generate dynamic, distinct API prompts."
+            )
+
+        context = {
+            "num_variations": settings.num_variations,
+            "base_seed": base_seed,
+            "template_styles": [
+                {
+                    "label": style.label,
+                    "prompt": style.prompt,
+                    "strength": style.strength,
+                    "guidance_scale": style.guidance_scale,
+                    "seed_offset": style.seed_offset,
+                }
+                for style in self.styles
+            ],
+            "hard_constraints": {
+                "keep_identity": True,
+                "exactly_n": settings.num_variations,
+                "strength_range": [0.38, 0.78],
+                "guidance_scale_range": [6.2, 10.0],
+                "distinctness": [
+                    "different environment/background per variation",
+                    "different lighting setup per variation",
+                    "different styling/accessory signal per variation",
+                    "different color palette/mood per variation",
+                ],
+            },
+        }
+
+        system_prompt = (
+            "You are a portrait prompt planner for an image-editing pipeline. "
+            "Return only JSON with key 'variations'. "
+            "The five outputs must be strongly distinct, not subtle variants. "
+            "Maximize separation in scene, background, lighting, wardrobe/accessories, and color mood while preserving identity."
+        )
+        user_prompt = (
+            "Generate exactly 5 API-edit styles. Each item must include label, prompt, strength, guidance_scale, seed_offset. "
+            "Do not repeat scene/background concepts across items. "
+            "Do not produce near-duplicates. "
+            "Avoid boilerplate, markdown, or explanations.\n\n"
+            "Return this JSON schema exactly:\n"
+            "{\n"
+            "  \"variations\": [\n"
+            "    {\n"
+            "      \"label\": \"string\",\n"
+            "      \"prompt\": \"string\",\n"
+            "      \"strength\": 0.55,\n"
+            "      \"guidance_scale\": 8.4,\n"
+            "      \"seed_offset\": 1\n"
+            "    }\n"
+            "  ]\n"
+            "}\n\n"
+            f"PROMPT_PLANNING_CONTEXT_JSON:\n{context}"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        endpoint = f"{settings.groq_base_url.rstrip('/')}/chat/completions"
+        timeout = max(10, int(settings.groq_timeout_seconds))
+        last_error = "unknown planning error"
+        for attempt in range(1, 4):
+            payload = {
+                "model": settings.groq_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": (
+                            user_prompt
+                            + f"\n\nAttempt: {attempt}. Ensure very strong separation among all five looks."
+                        ),
+                    },
+                ],
+                "temperature": 0.45 + (0.07 * (attempt - 1)),
+                "max_completion_tokens": 900,
+            }
+
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(endpoint, headers=headers, json=payload)
+            if response.status_code >= 400:
+                last_error = f"Groq API prompt planning failed: {response.status_code} {response.text}"
+                continue
+
+            body = response.json()
+            choices = body.get("choices") or []
+            if not choices:
+                last_error = "Groq API prompt planning returned no choices."
+                continue
+
+            content = str((choices[0].get("message") or {}).get("content") or "").strip()
+            if not content:
+                last_error = "Groq API prompt planning returned empty content."
+                continue
+
+            try:
+                parsed = self._parse_ai_variations_json(content)
+                planned = self._coerce_ai_api_styles(parsed)
+                self._assert_prompt_diversity(planned)
+                return planned
+            except Exception as exc:
+                last_error = str(exc)
+                continue
+
+        raise RuntimeError(f"Dynamic API prompt planning failed after retries: {last_error}")
 
     def _generate_modal_variations(
         self,
@@ -136,18 +276,30 @@ class ImageVariationGenerator:
 
         timeout = max(30, int(settings.modal_timeout_seconds))
         def send_modal_request(idx: int, style: VariationStyle, seed: int) -> tuple[int, VariationStyle, int, str]:
+            # SDXL-turbo is sensitive to extreme CFG/denoise; keep a balanced middle range.
+            raw_style_strength = max(0.05, min(0.95, float(style.strength)))
+            global_strength = max(0.05, min(0.95, float(settings.modal_strength)))
+            style_strength = max(0.32, min(0.68, (raw_style_strength * 0.6) + (global_strength * 0.4)))
+
+            # Mid-step range improves prompt response while limiting chroma blowups.
+            style_steps = max(4, min(7, int(round(3 + (style_strength * 6)))))
+
+            # Moderate guidance for turbo: enough steering without aggressive artifacts.
+            raw_style_guidance = max(0.0, min(10.0, float(style.guidance_scale)))
+            global_guidance = max(0.0, min(10.0, float(settings.modal_guidance_scale)))
+            style_guidance = max(1.0, min(3.6, (raw_style_guidance * 0.28) + (global_guidance * 0.72)))
             payload = {
                 "prompt": self._api_edit_prompt(style, idx),
                 "input_image_base64": input_b64,
                 "negative_prompt": (
                     "blurry, low quality, distorted face, changed identity, malformed eyes, "
-                    "waxy skin, artifacts"
+                    "waxy skin, artifacts, green spots, green speckles, chroma noise, color blotches"
                 ),
                 "width": width,
                 "height": height,
-                "strength": max(0.05, min(0.95, float(settings.modal_strength))),
-                "num_inference_steps": max(1, min(8, int(settings.modal_num_inference_steps))),
-                "guidance_scale": max(0.0, min(10.0, float(settings.modal_guidance_scale))),
+                "strength": style_strength,
+                "num_inference_steps": max(style_steps, max(1, min(8, int(settings.modal_num_inference_steps)))),
+                "guidance_scale": style_guidance,
                 "seed": int(seed),
             }
             with httpx.Client(timeout=timeout) as client:
@@ -229,7 +381,7 @@ class ImageVariationGenerator:
                     "parameters": {
                         "negative_prompt": (
                             "blurry, low quality, distorted face, changed identity, malformed eyes, "
-                            "waxy skin, artifacts"
+                            "waxy skin, artifacts, green spots, green speckles, chroma noise, color blotches"
                         ),
                         "guidance_scale": max(4.0, float(style.guidance_scale)),
                         "num_inference_steps": 30,
@@ -320,6 +472,265 @@ class ImageVariationGenerator:
                 )
             )
         return refined_styles
+
+    def refined_styles_from_feedback_ai(
+        self,
+        decisions: list[dict[str, Any]],
+        previous_variations: list[dict[str, Any]],
+        preference_profile: dict[str, Any] | None = None,
+    ) -> list[VariationStyle]:
+        api_key = (settings.groq_api_key or os.getenv("GROQ_API_KEY", "")).strip()
+        if not api_key:
+            raise RuntimeError("Prompt tweaking requires GROQ_API_KEY or VISGEN_GROQ_API_KEY.")
+
+        accepted_ids = {
+            int(item.get("variation_id", 0))
+            for item in decisions
+            if item.get("decision") == "accepted"
+        }
+        if not accepted_ids:
+            raise RuntimeError("Refinement requires at least one kept look.")
+
+        accepted_variations = [item for item in previous_variations if int(item.get("id", 0)) in accepted_ids]
+        if not accepted_variations:
+            raise RuntimeError("Refinement could not match kept looks to the previous variation set.")
+
+        profile = preference_profile or {}
+        selection_notes = [
+            {
+                "variation_id": int(item.get("variation_id", 0)),
+                "decision": str(item.get("decision", "")).strip(),
+                "reason": str(item.get("reason", "")).strip(),
+            }
+            for item in decisions
+            if str(item.get("reason", "")).strip()
+        ]
+        context = {
+            "num_variations": settings.num_variations,
+            "accepted_variations": [
+                {
+                    "id": item.get("id"),
+                    "label": item.get("label"),
+                    "prompt": item.get("prompt"),
+                    "strength": item.get("strength"),
+                    "guidance_scale": item.get("guidance_scale"),
+                }
+                for item in accepted_variations
+            ],
+            "all_decisions": decisions,
+            "selection_notes": selection_notes,
+            "preference_profile": profile,
+            "hard_constraints": {
+                "keep_identity": True,
+                "exactly_n": settings.num_variations,
+                "strength_range": [0.2, 0.62],
+                "guidance_scale_range": [5.8, 9.2],
+            },
+        }
+
+        system_prompt = (
+            "You generate refined portrait prompts for an img2img pipeline. "
+            "Use only provided JSON facts. Do not invent user preferences. "
+            "Selection notes (free-text reasons) are the strongest instruction signal. "
+            "When notes exist, prioritize them above trait heuristics and parameter metadata. "
+            "Never contradict explicit user notes. "
+            "Return valid JSON only with key 'variations'."
+        )
+        user_prompt = (
+            "Create exactly 5 refined variations from approved looks. "
+            "Each variation must include: label, prompt, strength, guidance_scale, seed_offset. "
+            "Prompts must preserve subject identity and make style differences noticeable. "
+            "Strongly weight selection_notes when deciding styling direction and wording. "
+            "If selection_notes conflict with preference_profile, follow selection_notes. "
+            "Do not include markdown or explanations.\n\n"
+            "Return this JSON schema exactly:\n"
+            "{\n"
+            "  \"variations\": [\n"
+            "    {\n"
+            "      \"label\": \"string\",\n"
+            "      \"prompt\": \"string\",\n"
+            "      \"strength\": 0.42,\n"
+            "      \"guidance_scale\": 7.8,\n"
+            "      \"seed_offset\": 101\n"
+            "    }\n"
+            "  ]\n"
+            "}\n\n"
+            f"REFINEMENT_CONTEXT_JSON:\n{context}"
+        )
+
+        payload = {
+            "model": settings.groq_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.35,
+            "max_completion_tokens": 900,
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        endpoint = f"{settings.groq_base_url.rstrip('/')}/chat/completions"
+        timeout = max(10, int(settings.groq_timeout_seconds))
+        with httpx.Client(timeout=timeout) as client:
+            response = client.post(endpoint, headers=headers, json=payload)
+        if response.status_code >= 400:
+            raise RuntimeError(f"Groq prompt tweaking failed: {response.status_code} {response.text}")
+
+        body = response.json()
+        choices = body.get("choices") or []
+        if not choices:
+            raise RuntimeError("Groq prompt tweaking returned no choices.")
+        content = str((choices[0].get("message") or {}).get("content") or "").strip()
+        if not content:
+            raise RuntimeError("Groq prompt tweaking returned empty content.")
+
+        parsed = self._parse_ai_variations_json(content)
+        return self._coerce_ai_refined_styles(parsed, accepted_variations)
+
+    def _parse_ai_variations_json(self, content: str) -> list[dict[str, Any]]:
+        text = content.strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            if text.startswith("json"):
+                text = text[4:].strip()
+
+        try:
+            obj = json.loads(text)
+        except json.JSONDecodeError:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start < 0 or end <= start:
+                raise RuntimeError("Groq prompt tweaking returned invalid JSON.")
+            obj = json.loads(text[start : end + 1])
+
+        variations = obj.get("variations") if isinstance(obj, dict) else None
+        if not isinstance(variations, list):
+            raise RuntimeError("Groq prompt tweaking JSON must contain a 'variations' list.")
+        if len(variations) != settings.num_variations:
+            raise RuntimeError(
+                f"Groq prompt tweaking must return exactly {settings.num_variations} variations."
+            )
+        return variations
+
+    def _coerce_ai_refined_styles(
+        self,
+        variations: list[dict[str, Any]],
+        accepted_variations: list[dict[str, Any]],
+    ) -> list[VariationStyle]:
+        coerced: list[VariationStyle] = []
+        used_seed_offsets: set[int] = set()
+
+        for idx, item in enumerate(variations):
+            base = accepted_variations[idx % len(accepted_variations)]
+            default_seed = 101 + (idx * 17)
+
+            label = str(item.get("label") or base.get("label") or f"Refined look {idx + 1}").strip()
+            prompt = str(item.get("prompt") or base.get("prompt") or "").strip()
+            if not prompt:
+                raise RuntimeError(f"Groq prompt tweaking returned an empty prompt at index {idx}.")
+
+            strength = self._clamp_float(item.get("strength"), 0.2, 0.62, float(base.get("strength", 0.4)))
+            guidance = self._clamp_float(
+                item.get("guidance_scale"),
+                5.8,
+                9.2,
+                float(base.get("guidance_scale", 7.0)),
+            )
+
+            try:
+                seed_offset = int(item.get("seed_offset", default_seed))
+            except (TypeError, ValueError):
+                seed_offset = default_seed
+            if seed_offset in used_seed_offsets:
+                seed_offset = default_seed
+            used_seed_offsets.add(seed_offset)
+
+            coerced.append(
+                VariationStyle(
+                    label=label,
+                    prompt=prompt,
+                    strength=strength,
+                    guidance_scale=guidance,
+                    seed_offset=seed_offset,
+                )
+            )
+        return coerced
+
+    def _coerce_ai_api_styles(self, variations: list[dict[str, Any]]) -> list[VariationStyle]:
+        coerced: list[VariationStyle] = []
+        used_seed_offsets: set[int] = set()
+
+        for idx, item in enumerate(variations):
+            base = self.styles[idx % len(self.styles)]
+            default_seed = idx + 1
+
+            label = str(item.get("label") or base.label or f"API look {idx + 1}").strip()
+            prompt = str(item.get("prompt") or base.prompt or "").strip()
+            if not prompt:
+                raise RuntimeError(f"Groq API prompt planning returned an empty prompt at index {idx}.")
+
+            strength = self._clamp_float(item.get("strength"), 0.38, 0.78, float(base.strength))
+            guidance = self._clamp_float(item.get("guidance_scale"), 6.2, 10.0, float(base.guidance_scale))
+
+            try:
+                seed_offset = int(item.get("seed_offset", default_seed))
+            except (TypeError, ValueError):
+                seed_offset = default_seed
+            if seed_offset in used_seed_offsets:
+                seed_offset = default_seed + (idx * 13)
+            used_seed_offsets.add(seed_offset)
+
+            coerced.append(
+                VariationStyle(
+                    label=label,
+                    prompt=prompt,
+                    strength=strength,
+                    guidance_scale=guidance,
+                    seed_offset=seed_offset,
+                )
+            )
+        return coerced
+
+    def _assert_prompt_diversity(self, styles: list[VariationStyle]) -> None:
+        if len(styles) != settings.num_variations:
+            raise RuntimeError(f"Expected {settings.num_variations} planned styles, got {len(styles)}.")
+
+        labels = [style.label.strip().lower() for style in styles]
+        if len(set(labels)) < len(labels):
+            raise RuntimeError("Prompt planner returned duplicate labels; distinct looks are required.")
+
+        def token_set(text: str) -> set[str]:
+            return {
+                part
+                for part in "".join(ch.lower() if ch.isalnum() else " " for ch in text).split()
+                if len(part) > 3
+            }
+
+        token_sets = [token_set(style.prompt) for style in styles]
+        for left in range(len(token_sets)):
+            for right in range(left + 1, len(token_sets)):
+                a = token_sets[left]
+                b = token_sets[right]
+                if not a or not b:
+                    continue
+                overlap = len(a & b)
+                union = len(a | b)
+                jaccard = overlap / union if union else 1.0
+                if jaccard > 0.72:
+                    raise RuntimeError(
+                        "Prompt planner produced near-duplicate prompt wording. "
+                        "Regenerate with stronger visual separation."
+                    )
+
+    def _clamp_float(self, value: Any, lower: float, upper: float, default: float) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            parsed = default
+        return max(lower, min(upper, parsed))
 
     def _strip_refinement_boilerplate(self, prompt: str) -> str:
         markers = [
@@ -449,7 +860,7 @@ class ImageVariationGenerator:
         negative_prompt = (
             "low quality, blurry, distorted face, changed identity, deformed eyes, "
             "asymmetrical face, malformed mouth, plastic skin, artifacts, watermark, text, "
-            "extra limbs, deformed geometry, oversaturated"
+            "extra limbs, deformed geometry, oversaturated, green spots, green speckles, chroma noise"
         )
 
         results: list[dict[str, Any]] = []
@@ -718,7 +1129,7 @@ class ImageVariationGenerator:
         negative_prompt = (
             "low quality, blurry, distorted face, changed identity, deformed eyes, "
             "asymmetrical face, malformed mouth, plastic skin, waxy skin, artifacts, "
-            "watermark, text, extra facial features, bad teeth, oversaturated"
+            "watermark, text, extra facial features, bad teeth, oversaturated, green spots, chroma noise"
         )
 
         results: list[dict[str, Any]] = []
@@ -791,14 +1202,20 @@ class ImageVariationGenerator:
         return results
 
     def _api_edit_prompt(self, style: VariationStyle, idx: int) -> str:
+        background_instruction = (
+            "Follow explicit background instructions from the style prompt when present, "
+            "such as remove, replace, or keep the background."
+        )
         return (
             "Edit the uploaded portrait into a professional photography result. "
             f"Studio look {idx}: {style.label}. {style.prompt}. "
             "Make this output visibly distinct from the other studio looks through lighting, "
-            "color grade, background treatment, and photographic mood. Preserve the person's "
+            "color grade, composition, and photographic mood. "
+            f"{background_instruction} "
+            "Preserve the person's "
             "identity, facial structure, eye shape, nose, mouth, age, and natural skin texture. "
             "Do not beautify by changing identity. Avoid warped eyes, altered teeth, plastic skin, "
-            "extra facial features, or artificial-looking retouching."
+            "extra facial features, artificial-looking retouching, green spots, green speckles, or chroma noise."
         )
 
     def _api_text_to_image_prompt(self, style: VariationStyle, idx: int) -> str:
@@ -847,9 +1264,32 @@ class ImageVariationGenerator:
         return ImageEnhance.Contrast(image).enhance(1.04)
 
     def _studio_finish(self, image: Image.Image) -> Image.Image:
+        image = self._suppress_green_speckles(image)
         image = ImageEnhance.Contrast(image).enhance(1.04)
         image = ImageEnhance.Sharpness(image).enhance(1.06)
         return image
+
+    def _suppress_green_speckles(self, image: Image.Image) -> Image.Image:
+        try:
+            import numpy as np
+        except Exception:
+            return image
+
+        arr = np.array(image.convert("RGB"), copy=True)
+        red = arr[:, :, 0].astype(np.int16)
+        green = arr[:, :, 1].astype(np.int16)
+        blue = arr[:, :, 2].astype(np.int16)
+
+        mask = (green > 150) & (green > (red * 1.45)) & (green > (blue * 1.45))
+        ratio = float(mask.mean())
+
+        # Only suppress isolated chroma speckles; skip naturally green scenes.
+        if ratio == 0.0 or ratio > 0.01:
+            return image
+
+        neutral = ((red + blue) // 2).astype(np.uint8)
+        arr[:, :, 1][mask] = neutral[mask]
+        return Image.fromarray(arr, mode="RGB")
 
     def _preserve_faces(self, source: Image.Image, generated: Image.Image) -> tuple[Image.Image, int]:
         source_boxes = self._detect_faces(source)

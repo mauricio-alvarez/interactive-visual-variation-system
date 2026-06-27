@@ -12,28 +12,28 @@ generation:
   notes: "Designed for an RTX 3060 Ti 8GB. API studio is the preferred production path when stronger, more distinct portrait edits are required."
 
 variations:
-  - label: "Natural lighting"
-    prompt: "bright sunlit professional lifestyle portrait, high-key daylight flooding from one side, crisp white bounce fill, airy cream background with visible depth, same face, same identity, razor-sharp eyes, 85mm lens, clean but noticeable retouching"
+  - label: "Beach sun hat"
+    prompt: "bright sunlit lifestyle portrait on a beach boardwalk, soft straw sun hat, light ocean breeze in hair, blue sky and sea background, warm natural daylight, same face, same identity, razor-sharp eyes, 85mm lens, clean but visible retouching"
     strength: 0.54
     guidance_scale: 8.2
     seed_offset: 1
-  - label: "Cinematic tint"
-    prompt: "bold low-key cinematic portrait, deep teal shadows and strong amber highlights, hard rim light, moody textured dark background, same face, same identity, realistic skin texture, sharp eyes, dramatic film still contrast"
+  - label: "Neon noir street"
+    prompt: "bold low-key cinematic portrait in a neon city street at night, black leather jacket and subtle earrings, reflective wet pavement background, deep teal shadows and amber highlights, hard rim light, same face, same identity, realistic skin texture, sharp eyes, dramatic film still contrast"
     strength: 0.66
     guidance_scale: 9.0
     seed_offset: 2
-  - label: "Studio headshot"
-    prompt: "high-impact commercial studio headshot, bright dual softbox catchlights, pristine seamless gray backdrop, ultra-crisp business portrait framing, same face, same identity, confident natural expression, tack-sharp eyes, realistic skin"
+  - label: "Corporate studio"
+    prompt: "high-impact commercial studio headshot with modern corporate styling, fitted blazer and clean shirt collar, pristine seamless gray backdrop, bright dual softbox catchlights, ultra-crisp business portrait framing, same face, same identity, confident natural expression, tack-sharp eyes, realistic skin"
     strength: 0.52
     guidance_scale: 8.6
     seed_offset: 3
-  - label: "Editorial polish"
-    prompt: "fashion magazine editorial portrait with strong directional key light, punchy refined contrast, deep sophisticated background separation, same face, same identity, realistic skin pores, sharp eyes, premium high-fashion color grading"
+  - label: "Red editorial"
+    prompt: "fashion magazine editorial portrait with dramatic red backdrop and flowing fabric movement, statement hat or headpiece, strong directional key light, punchy refined contrast, same face, same identity, realistic skin pores, sharp eyes, premium high-fashion color grading"
     strength: 0.68
     guidance_scale: 9.2
     seed_offset: 4
-  - label: "Soft luxury retouch"
-    prompt: "high-end beauty campaign portrait, soft clamshell lighting with glowing highlights, luminous polished skin while keeping natural texture, elegant warm champagne background, same face, same identity, no plastic skin, luxury campaign finish"
+  - label: "Hotel luxury beauty"
+    prompt: "high-end beauty campaign portrait in a luxury hotel lobby setting, elegant pearl jewelry and soft silk styling, warm marble background blur, soft clamshell lighting with glowing highlights, luminous polished skin while keeping natural texture, same face, same identity, no plastic skin, luxury campaign finish"
     strength: 0.58
     guidance_scale: 8.4
     seed_offset: 5

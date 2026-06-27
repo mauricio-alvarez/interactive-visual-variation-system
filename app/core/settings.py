@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     disable_safety_checker: bool = True
     explainer_provider: str = "rule"
     local_llm_model_id: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    groq_api_key: str = ""
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    groq_timeout_seconds: int = 30
     api_provider: str = "openai"
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
