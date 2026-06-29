@@ -2,6 +2,10 @@
 
 FastAPI project for the advanced version of UTEC Project 2. The app works as a local AI portrait studio: it takes a user image, creates exactly five professional photographer-style looks, collects keep/pass feedback, and produces a faithful decision summary.
 
+### Github repository link
+
+https://github.com/mauricio-alvarez/interactive-visual-variation-system
+
 ## Current design
 
 - Provider switch with Preview, local GPU studio, and API studio modes.
